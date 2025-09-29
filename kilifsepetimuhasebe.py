@@ -2051,7 +2051,9 @@ def parse_xml_invoice_metadata(xml_path: Path) -> Tuple[set, Dict[str, Optional[
     if supplier is not None and supplier.text:
         meta["supplier"] = supplier.text.strip()
 
-    amount_elem = root.find('.//{*}PayableAmount') or root.find('.//{*}LineExtensionAmount')
+    amount_elem = root.find('.//{*}PayableAmount')
+    if amount_elem is None:
+        amount_elem = root.find('.//{*}LineExtensionAmount')
     if amount_elem is not None and amount_elem.text:
         try:
             meta["amount"] = parse_money(amount_elem.text)
@@ -3820,9 +3822,10 @@ class InventoryTab(ttk.Frame):
 # HAKKIMIZDA SEKME
 # ===========================================================================
 class AboutTab(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, open_tab_callback=None):
         super().__init__(parent, padding=PADDING['xlarge'])
         self.parent = parent
+        self._open_tab = open_tab_callback or (lambda *_: None)
         
         # Ultra-modern header with gradient effect
         header_frame = ttk.Frame(self, style='Elevated.TFrame')
@@ -4137,7 +4140,7 @@ class MainApp(tk.Tk):
         self.pdf_tab     = PDFMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
         self.xml_tab     = XMLMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
         self.inv_tab     = InventoryTab(self.notebook)
-        self.about_tab   = AboutTab(self.notebook)
+        self.about_tab   = AboutTab(self.notebook, open_tab_callback=self.show_tab)
 
         self.notebook.add(self.invoice_tab, text='Fatura')
         self.notebook.add(self.report_tab,  text='Rapor')
