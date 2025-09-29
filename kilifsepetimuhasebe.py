@@ -2566,7 +2566,10 @@ class XMLMatcherTab(ttk.Frame):
 
         paned = ttk.Panedwindow(self, orient='vertical')
         paned.grid(row=1, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
-        paned.configure(sashrelief='flat', sashwidth=14)
+        try:
+            paned.configure(sashrelief='flat', sashwidth=14)
+        except tk.TclError:
+            pass
 
         top_shell = ttk.Frame(paned, style='Surface.TFrame', padding=PADDING['large'])
         top_shell.columnconfigure(0, weight=1)
