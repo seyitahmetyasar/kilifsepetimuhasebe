@@ -79,50 +79,62 @@ except Exception:
 # ===========================================================================
 
 # Modern Brand Colors
-BRAND_GREEN = '#00D4AA'   # Modern teal-green
-BRAND_BLUE = '#0066FF'    # Vibrant blue
-BRAND_PURPLE = '#8B5CF6'  # Modern purple
+BRAND_AQUA   = '#14B8A6'  # fresh aqua accent
+BRAND_INDIGO = '#6366F1'  # soft indigo highlight
+BRAND_CYAN   = '#22D3EE'  # highlight for interactions
 
 LIGHT_COLORS = {
-    'primary'   : '#1A1A1A',
-    'secondary' : BRAND_BLUE,
-    'accent'    : BRAND_GREEN,
-    'accent_hover': '#00B894',
-    'warning'   : '#FF6B6B',
-    'success'   : '#51CF66',
-    'background': '#F8FAFC',
-    'card'      : '#FFFFFF',
-    'card_hover': '#F1F5F9',
-    'text'      : '#1A1A1A',
-    'text_light': '#64748B',
-    'text_muted': '#94A3B8',
-    'border'    : '#E2E8F0',
-    'border_light': '#F1F5F9',
-    'hover'     : '#F8FAFC',
-    'shadow'    : 'rgba(0, 0, 0, 0.1)',
+    'primary'      : '#0F172A',
+    'secondary'    : BRAND_INDIGO,
+    'accent'       : BRAND_AQUA,
+    'accent_hover' : '#0FA59B',
+    'warning'      : '#F97316',
+    'success'      : '#10B981',
+    'background'   : '#F8FAFC',
+    'surface'      : '#F1F5F9',
+    'card'         : '#FFFFFF',
+    'card_hover'   : '#E2E8F0',
+    'text'         : '#0F172A',
+    'text_light'   : '#475569',
+    'text_muted'   : '#94A3B8',
+    'border'       : '#CBD5F5',
+    'border_light' : '#E2E8F0',
+    'hover'        : '#E2E8F0',
+    'shadow'       : 'rgba(15, 23, 42, 0.08)',
+    'hero_bg'      : '#E0F2F1',
+    'hero_fg'      : '#0F172A',
+    'hero_subtle'  : '#4B5563',
+    'glass'        : '#FFFFFFCC',
+    'glass_border' : '#E2E8F0',
     'gradient_start': '#FFFFFF',
-    'gradient_end': '#F8FAFC'
+    'gradient_end' : '#F8FAFC'
 }
 
 DARK_COLORS = {
-    'primary'   : '#F1F5F9',
-    'secondary' : '#3B82F6',
-    'accent'    : BRAND_GREEN,
-    'accent_hover': '#00B894',
-    'warning'   : '#F87171',
-    'success'   : '#34D399',
-    'background': '#0F172A',
-    'card'      : '#1E293B',
-    'card_hover': '#334155',
-    'text'      : '#F1F5F9',
-    'text_light': '#CBD5E1',
-    'text_muted': '#94A3B8',
-    'border'    : '#334155',
-    'border_light': '#475569',
-    'hover'     : '#1E293B',
-    'shadow'    : 'rgba(0, 0, 0, 0.3)',
-    'gradient_start': '#1E293B',
-    'gradient_end': '#0F172A'
+    'primary'      : '#F8FAFC',
+    'secondary'    : BRAND_CYAN,
+    'accent'       : BRAND_AQUA,
+    'accent_hover' : '#0FA59B',
+    'warning'      : '#FB7185',
+    'success'      : '#34D399',
+    'background'   : '#050B1A',
+    'surface'      : '#0B162C',
+    'card'         : '#101F3A',
+    'card_hover'   : '#152748',
+    'text'         : '#E2E8F0',
+    'text_light'   : '#94A3B8',
+    'text_muted'   : '#64748B',
+    'border'       : '#1E335C',
+    'border_light' : '#233A6B',
+    'hover'        : '#162B4F',
+    'shadow'       : 'rgba(8, 15, 35, 0.35)',
+    'hero_bg'      : '#12274B',
+    'hero_fg'      : '#ECFEFF',
+    'hero_subtle'  : '#7DD3FC',
+    'glass'        : '#0F1F3ACC',
+    'glass_border' : '#1E335C',
+    'gradient_start': '#162B4F',
+    'gradient_end' : '#050B1A'
 }
 
 COLORS = LIGHT_COLORS.copy()
@@ -161,282 +173,220 @@ def apply_modern_theme(root, existing_style=None):
     except Exception:
         pass
 
-    # Modern typography with better readability
-    base_font = ('Segoe UI', 11)  # Increased base size for better readability
-    medium_font = ('Segoe UI', 12)
-    title_font = ('Segoe UI', 13, 'bold')
-    large_title_font = ('Segoe UI', 15, 'bold')
-    button_font = ('Segoe UI', 11, 'bold')  # Bold for buttons
+    accent_text_color = '#04111B' if COLORS['background'] == LIGHT_COLORS['background'] else '#ECFEFF'
 
-    # Modern Frames with subtle gradients
+    # Modern typography with better readability
+    base_font = ('Segoe UI Variable Text', 11)
+    medium_font = ('Segoe UI Variable Text', 12)
+    title_font = ('Segoe UI Variable Display', 13, 'bold')
+    large_title_font = ('Segoe UI Variable Display', 16, 'bold')
+    hero_title_font = ('Segoe UI Variable Display', 20, 'bold')
+    hero_subtitle_font = ('Segoe UI Variable Text', 11)
+    button_font = ('Segoe UI', 11, 'bold')
+
+    # Layered frames & containers
     style.configure('TFrame', background=COLORS['background'], relief='flat', borderwidth=0)
-    style.configure('Card.TFrame', 
-        background=COLORS['card'], 
-        relief='flat', 
+    style.configure('Surface.TFrame', background=COLORS['surface'], relief='flat', borderwidth=0)
+    style.configure('Card.TFrame',
+        background=COLORS['card'],
+        relief='flat',
         borderwidth=1,
         bordercolor=COLORS['border'])
-    style.configure('Elevated.TFrame', 
-        background=COLORS['card'], 
-        relief='solid', 
+    style.configure('Glass.TFrame',
+        background=COLORS['glass'],
+        relief='solid',
+        borderwidth=1,
+        bordercolor=COLORS['glass_border'])
+    style.configure('Elevated.TFrame',
+        background=COLORS['card'],
+        relief='solid',
         borderwidth=1,
         bordercolor=COLORS['border_light'])
-    
-    # Modern LabelFrames with subtle gradients
-    style.configure('TLabelframe', 
-        background=COLORS['card'], 
+    style.configure('Hero.TFrame',
+        background=COLORS['hero_bg'],
+        relief='flat',
+        borderwidth=0)
+    style.configure('HeroImage.TLabel',
+        background=COLORS['hero_bg'])
+    style.configure('HeroBadge.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['accent'],
+        font=('Segoe UI', 10, 'bold'),
+        padding=(12, 4))
+
+    # Modern LabelFrames with soft glow
+    style.configure('TLabelframe',
+        background=COLORS['card'],
         bordercolor=COLORS['border'],
         borderwidth=1,
         relief='solid')
-    style.configure('TLabelframe.Label', 
-        background=COLORS['card'], 
-        foreground=COLORS['accent'], 
-        font=('Segoe UI', 12, 'bold'),
-        padding=(8, 4))
+    style.configure('TLabelframe.Label',
+        background=COLORS['card'],
+        foreground=COLORS['accent'],
+        font=('Segoe UI', 11, 'bold'),
+        padding=(10, 6))
 
     # Enhanced Labels
-    style.configure('TLabel', 
-        background=COLORS['background'], 
-        foreground=COLORS['text'], 
+    style.configure('TLabel',
+        background=COLORS['background'],
+        foreground=COLORS['text'],
         font=base_font)
-    style.configure('Card.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['text'], 
+    style.configure('Surface.TLabel',
+        background=COLORS['surface'],
+        foreground=COLORS['text'],
         font=base_font)
-    style.configure('Title.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['accent'], 
+    style.configure('Card.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['text'],
+        font=base_font)
+    style.configure('Title.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['accent'],
         font=title_font)
-    style.configure('LargeTitle.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['primary'], 
+    style.configure('LargeTitle.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['primary'],
         font=large_title_font)
+    style.configure('HeroTitle.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['hero_fg'],
+        font=hero_title_font)
+    style.configure('HeroSub.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['hero_subtle'],
+        font=hero_subtitle_font)
 
     # Modern Entry & Combobox with enhanced focus states
     style.configure('TEntry',
-        fieldbackground=COLORS['card'], 
+        fieldbackground=COLORS['card'],
         foreground=COLORS['text'],
-        bordercolor=COLORS['border'], 
-        lightcolor=COLORS['border_light'], 
+        bordercolor=COLORS['border'],
+        lightcolor=COLORS['border_light'],
         darkcolor=COLORS['border'],
-        insertcolor=COLORS['accent'], 
-        relief='solid', 
-        borderwidth=1,
-        padding=14, 
-        font=base_font
-    )
+        padding=(14, 9))
     style.map('TEntry',
-        fieldbackground=[('focus', COLORS['card'])],
-        bordercolor=[('focus', COLORS['accent'])],
-        lightcolor=[('focus', COLORS['accent'])],
-        darkcolor=[('focus', COLORS['accent'])]
-    )
-    
+        fieldbackground=[('focus', COLORS['card_hover'])],
+        bordercolor=[('focus', COLORS['accent'])])
+
     style.configure('TCombobox',
-        fieldbackground=COLORS['card'], 
-        background=COLORS['card'], 
+        fieldbackground=COLORS['card'],
         foreground=COLORS['text'],
-        arrowcolor=COLORS['text_muted'], 
-        bordercolor=COLORS['border'], 
-        relief='solid',
-        borderwidth=1,
-        padding=12, 
-        font=base_font
-    )
+        bordercolor=COLORS['border'],
+        lightcolor=COLORS['border_light'],
+        darkcolor=COLORS['border'],
+        padding=12,
+        font=base_font,
+        relief='flat',
+        borderwidth=1)
     style.map('TCombobox',
         fieldbackground=[
-            ('readonly', COLORS['card']), 
-            ('focus', COLORS['card']),
-            ('hover', COLORS['card_hover'])
+            ('readonly', COLORS['card']),
+            ('focus', COLORS['card'])
         ],
         bordercolor=[
             ('focus', COLORS['accent']),
-            ('hover', COLORS['border'])
+            ('hover', COLORS['border_light'])
         ],
         arrowcolor=[
             ('focus', COLORS['accent']),
             ('hover', COLORS['secondary'])
-        ]
-    )
-    
+        ])
+
     # Modern dropdown styling
     root.option_add('*TCombobox*Listbox.background', COLORS['card'])
     root.option_add('*TCombobox*Listbox.foreground', COLORS['text'])
     root.option_add('*TCombobox*Listbox.selectBackground', COLORS['accent'])
-    root.option_add('*TCombobox*Listbox.selectForeground', '#ffffff')
-    root.option_add('*TCombobox*Listbox.borderWidth', '2')
-    root.option_add('*TCombobox*Listbox.relief', 'solid')
+    root.option_add('*TCombobox*Listbox.selectForeground', '#FFFFFF')
+    root.option_add('*TCombobox*Listbox.borderWidth', '0')
+    root.option_add('*TCombobox*Listbox.relief', 'flat')
 
-    # Modern Notebook / Tabs with subtle elevation
-    style.configure('TNotebook', 
-        background=COLORS['background'], 
-        borderwidth=0, 
-        tabmargins=[4, 6, 4, 0])
+    # Modern Notebook / Tabs with pill look
+    style.configure('TNotebook',
+        background=COLORS['background'],
+        borderwidth=0,
+        tabmargins=[18, 14, 18, 0])
     style.configure('TNotebook.Tab',
-        background=COLORS['border_light'], 
+        background=COLORS['surface'],
         foreground=COLORS['text_muted'],
-        padding=[20, 12], 
+        padding=[20, 10],
         font=('Segoe UI', 11, 'bold'),
         borderwidth=0,
-        relief='flat'
-    )
+        relief='flat')
     style.map('TNotebook.Tab',
-        background=[
-            ('selected', COLORS['card']), 
-            ('active', COLORS['card_hover'])
-        ],
-        foreground=[
-            ('selected', COLORS['accent']), 
-            ('active', COLORS['text'])
-        ]
-    )
+        background=[('selected', COLORS['accent']), ('active', COLORS['card_hover'])],
+        foreground=[('selected', '#FFFFFF'), ('active', COLORS['text'])])
 
     # Modern Treeview with enhanced visual hierarchy
     style.configure('Treeview',
-        background=COLORS['card'], 
+        background=COLORS['card'],
         fieldbackground=COLORS['card'],
-        foreground=COLORS['text'], 
+        foreground=COLORS['text'],
         bordercolor=COLORS['border'],
         borderwidth=1,
-        relief='solid',
-        rowheight=36, 
+        relief='flat',
+        rowheight=34,
         font=base_font)
     style.configure('Treeview.Heading',
-        background=COLORS['background'], 
+        background=COLORS['surface'],
         foreground=COLORS['text'],
         relief='flat',
         borderwidth=0,
         font=('Segoe UI', 11, 'bold'))
     style.map('Treeview',
-        background=[
-            ('selected', COLORS['accent']),
-            ('focus', COLORS['card_hover'])
-        ],
-        foreground=[
-            ('selected', '#ffffff'),
-            ('focus', COLORS['text'])
-        ]
-    )
+        background=[('selected', COLORS['accent']), ('focus', COLORS['card_hover'])],
+        foreground=[('selected', '#FFFFFF'), ('focus', COLORS['text'])])
 
-    # Standard buttons with subtle elevation effect
-    style.configure('TButton', 
-        background=COLORS['card'], 
-        foreground=COLORS['text'], 
-        borderwidth=1, 
-        relief='solid', 
-        bordercolor=COLORS['border'],
-        padding=(16, 14), 
-        font=button_font
-    )
+    # Buttons with pill appearance
+    base_button_conf = dict(
+        padding=(18, 10),
+        relief='flat',
+        borderwidth=0,
+        font=button_font,
+        background=COLORS['card'],
+        foreground=COLORS['text'])
+    style.configure('TButton', **base_button_conf)
     style.map('TButton',
-        background=[
-            ('pressed', COLORS['border_light']), 
-            ('active', COLORS['card_hover']),
-            ('disabled', COLORS['background'])
-        ],
-        bordercolor=[
-            ('pressed', COLORS['border']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['border_light'])
-        ],
-        foreground=[
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', COLORS['card_hover']), ('pressed', COLORS['card_hover'])])
 
-    # Ultra-modern buttons with subtle shadows and enhanced hover states
-    style.configure('Accent.TButton', 
-        background=COLORS['accent'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(20, 18), 
-        font=button_font
-    )
+    style.configure('Accent.TButton',
+        **base_button_conf,
+        background=COLORS['accent'],
+        foreground=accent_text_color)
     style.map('Accent.TButton',
-        background=[
-            ('pressed', COLORS['accent_hover']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ],
-        relief=[('pressed', 'flat'), ('active', 'flat')]
-    )
+        background=[('active', COLORS['accent_hover']), ('pressed', COLORS['accent_hover'])],
+        foreground=[('pressed', accent_text_color)])
 
-    # Secondary Button
-    style.configure('Secondary.TButton', 
-        background=COLORS['background'], 
-        foreground=COLORS['text'], 
-        borderwidth=1, 
-        relief='solid', 
-        bordercolor=COLORS['border'],
-        padding=(18, 16), 
-        font=button_font
-    )
+    style.configure('Secondary.TButton',
+        **base_button_conf,
+        background=COLORS['surface'])
     style.map('Secondary.TButton',
-        background=[
-            ('pressed', COLORS['border_light']), 
-            ('active', COLORS['card']),
-            ('disabled', COLORS['background'])
-        ],
-        bordercolor=[
-            ('pressed', COLORS['border']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['border_light'])
-        ],
-        foreground=[
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', COLORS['card_hover']), ('pressed', COLORS['card_hover'])])
 
-    # Warning Button
-    style.configure('Warning.TButton', 
-        background=COLORS['warning'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(18, 16), 
-        font=button_font
-    )
+    style.configure('Warning.TButton',
+        **base_button_conf,
+        background=COLORS['warning'],
+        foreground='#FFFFFF')
     style.map('Warning.TButton',
-        background=[
-            ('pressed', COLORS['warning']), 
-            ('active', COLORS['warning']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', '#FF8F9F'), ('pressed', '#FF8F9F')])
 
-    # Success Button
-    style.configure('Success.TButton', 
-        background=COLORS['success'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(18, 16), 
-        font=button_font
-    )
-    style.map('Success.TButton',
-        background=[
-            ('pressed', COLORS['success']), 
-            ('active', COLORS['success']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
-
-    # Modern Checkboxes and Radio buttons
-    style.configure('TCheckbutton', 
-        background=COLORS['card'], 
+    # Toggle controls
+    style.configure('TCheckbutton',
+        background=COLORS['card'],
         foreground=COLORS['text'],
         font=base_font,
+        borderwidth=0,
+        focusthickness=2,
         focuscolor=COLORS['accent'])
     style.map('TCheckbutton',
         background=[('active', COLORS['card_hover'])],
         indicatorcolor=[('selected', COLORS['accent'])])
-        
-    style.configure('TRadiobutton', 
-        background=COLORS['card'], 
+
+    style.configure('TRadiobutton',
+        background=COLORS['card'],
         foreground=COLORS['text'],
         font=base_font,
+        borderwidth=0,
+        focusthickness=2,
         focuscolor=COLORS['accent'])
     style.map('TRadiobutton',
         background=[('active', COLORS['card_hover'])],
@@ -451,37 +401,28 @@ def apply_modern_theme(root, existing_style=None):
         borderwidth=0,
         width=12)
     style.map('TScrollbar',
-        background=[
-            ('active', COLORS['border']),
-            ('pressed', COLORS['border_light'])
-        ],
-        arrowcolor=[
-            ('active', COLORS['accent']),
-            ('pressed', COLORS['secondary'])
-        ]
-    )
+        background=[('active', COLORS['border']), ('pressed', COLORS['border_light'])],
+        arrowcolor=[('active', COLORS['accent']), ('pressed', COLORS['secondary'])])
 
     # Global TK widget styling
     root.option_add('*Font', base_font)
-    root.option_add('*Button.relief', 'solid')
-    root.option_add('*Button.borderWidth', '2')
+    root.option_add('*Button.relief', 'flat')
+    root.option_add('*Button.borderWidth', '0')
     root.option_add('*Button.highlightThickness', '0')
     root.option_add('*Button.activeBackground', COLORS['card_hover'])
     root.option_add('*Button.activeForeground', COLORS['text'])
     root.option_add('*Button.background', COLORS['card'])
     root.option_add('*Button.foreground', COLORS['text'])
-    root.option_add('*Button.font', ('Segoe UI', 10, 'bold'))
+    root.option_add('*Button.font', button_font)
 
     # Modern window styling
     root.configure(background=COLORS['background'])
-    
-    # Try to enable modern window decorations (Windows 11 style)
+
     try:
-        # Set modern window appearance
         root.tk.call('tk', 'scaling', 1.0)
     except Exception:
         pass
-    
+
     return style
 
 
@@ -2478,63 +2419,116 @@ class PDFMatcherTab(ttk.Frame):
         self.log.delete('1.0', tk.END)
 
 
+
 class XMLMatcherTab(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, apis, headers, invoice_tab_ref: InvoiceTab):
         super().__init__(parent, padding=10)
+        self.apis = apis
+        self.headers = headers
+        self.invoice_tab_ref = invoice_tab_ref
+        self.settings = load_settings()
+
         self.stop_event = threading.Event()
         self.worker: Optional[threading.Thread] = None
         self.last_params: Optional[Tuple[str, List[str]]] = None
         self.output_dir: Optional[str] = None
 
-        self.xml_folder_var = tk.StringVar()
-        self.excel_files_var = tk.StringVar()
-        self.amount_tolerance = tk.StringVar(value="1.0")
+        self.xml_folder_var = tk.StringVar(value=self.settings.get('last_xml_folder', ''))
+        self.excel_files_var = tk.StringVar(value=self.settings.get('last_xml_excel', ''))
+        self.amount_tolerance = tk.StringVar(value=self.settings.get('xml_amount_tolerance', '1.0'))
 
-        hero = ttk.Frame(self, style='Elevated.TFrame', padding=PADDING['medium'])
-        hero.pack(fill='x', padx=12, pady=(0, PADDING['medium']))
-        ttk.Label(hero, text='🧾 XML Eşleştirici', style='LargeTitle.TLabel').pack(anchor='w')
+        root_cols = 12
+        for c in range(root_cols):
+            self.columnconfigure(c, weight=1)
+
+        ttk.Label(self, text='XML Eşleştirici', style='LargeTitle.TLabel').grid(
+            row=0, column=0, columnspan=root_cols, sticky='w')
         ttk.Label(
-            hero,
-            text='UBL XML faturalarını Excel listelerindeki seri numaralarıyla otomatik karşılaştırın ve tutar farklarını izleyin.',
+            self,
+            text='UBL XML faturalarını Excel listelerindeki seri numaraları ve tutarlarla eşleştirin.',
             style='Card.TLabel',
             foreground=COLORS['text_muted']
-        ).pack(anchor='w', pady=(6, 0))
+        ).grid(row=1, column=0, columnspan=root_cols, sticky='w', pady=(0, PADDING['small']))
 
-        inputs = ttk.LabelFrame(self, text='Girdi Ayarları', style='TLabelframe', padding=PADDING['medium'])
-        inputs.pack(fill='x', padx=12, pady=(0, PADDING['medium']))
-        inputs.columnconfigure(1, weight=1)
+        ttk.Label(self, text='API Hesabı (XML indir için):').grid(row=2, column=0, sticky='w')
+        self.api_var = tk.StringVar()
+        self.api_cb = ttk.Combobox(self, values=list(apis.keys()), textvariable=self.api_var, state='readonly')
+        self.api_cb.grid(row=2, column=1, sticky='ew')
+        if apis:
+            last_api = self.settings.get('last_xml_api') or self.settings.get('last_api', '')
+            if last_api in apis:
+                self.api_cb.set(last_api)
+            else:
+                self.api_cb.current(0)
+            apply_api(apis.get(self.api_cb.get(), ''), self.headers)
+        else:
+            self.api_cb.set('— API ekleyin (opsiyonel) —')
+        self.api_cb.configure(background=COLORS['card'], foreground=COLORS['text'])
+        self.api_cb.bind('<<ComboboxSelected>>', self._on_api_change)
 
-        ttk.Label(inputs, text='XML Klasörü:', style='Card.TLabel').grid(row=0, column=0, sticky='w')
-        ttk.Entry(inputs, textvariable=self.xml_folder_var).grid(row=0, column=1, sticky='ew', padx=(PADDING['small'], 0))
-        ttk.Button(inputs, text='📂 Seç', command=self._browse_xml_folder).grid(row=0, column=2, padx=(PADDING['small'], 0))
+        now = datetime.now()
+        ttk.Label(self, text='Yıl:').grid(row=2, column=2, sticky='e')
+        years = [str(now.year + i) for i in range(-10, 15)]
+        self.year = ttk.Combobox(self, values=years, width=6, state='readonly')
+        self.year.set(str(now.year))
+        self.year.grid(row=2, column=3, sticky='w')
+        self.year.configure(background=COLORS['card'], foreground=COLORS['text'])
 
-        ttk.Label(inputs, text='Excel Dosyaları:', style='Card.TLabel').grid(row=1, column=0, sticky='w', pady=(PADDING['small'], 0))
-        ttk.Entry(inputs, textvariable=self.excel_files_var).grid(row=1, column=1, sticky='ew', padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
-        ttk.Button(inputs, text='📄 Seç', command=self._browse_excel_files).grid(row=1, column=2, padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
+        ttk.Label(self, text='Ay:').grid(row=2, column=4, sticky='e')
+        self.month = ttk.Combobox(self, values=[f"{i:02d}" for i in range(1, 13)], width=4, state='readonly')
+        self.month.set(f"{now.month:02d}")
+        self.month.grid(row=2, column=5, sticky='w')
+        self.month.configure(background=COLORS['card'], foreground=COLORS['text'])
 
-        options = ttk.Frame(inputs, style='Card.TFrame')
-        options.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(PADDING['small'], 0))
-        ttk.Label(options, text='Tutar toleransı (TL):', style='Card.TLabel').pack(side='left')
-        ttk.Entry(options, textvariable=self.amount_tolerance, width=8).pack(side='left', padx=(PADDING['xs'], PADDING['small']))
-        ttk.Label(options, text='(Boş bırakılırsa tutar karşılaştırması yapılmaz)', style='Card.TLabel', foreground=COLORS['text_muted']).pack(side='left')
+        self.btn_fetch_incoming = ttk.Button(
+            self,
+            text="📥 e-Fatura Gelen'den XML indir",
+            style='Accent.TButton',
+            command=self._fetch_incoming_xmls
+        )
+        self.btn_fetch_incoming.grid(row=2, column=6, sticky='w', padx=6)
 
-        actions = ttk.Frame(self, style='Card.TFrame', padding=PADDING['medium'])
-        actions.pack(fill='x', padx=12, pady=(0, PADDING['medium']))
-        self.btn_start = ttk.Button(actions, text='🚀 Başlat', style='Accent.TButton', command=self._start)
-        self.btn_start.pack(side='left', padx=6)
-        self.btn_stop = ttk.Button(actions, text='⏹ Durdur', style='Warning.TButton', command=self._stop, state='disabled')
-        self.btn_stop.pack(side='left', padx=6)
-        self.btn_restart = ttk.Button(actions, text='🔄 Yeniden', style='Secondary.TButton', command=self._restart, state='disabled')
-        self.btn_restart.pack(side='left', padx=6)
-        ttk.Button(actions, text='📁 Çıktı Klasörü', command=self._open_output).pack(side='right', padx=6)
+        ttk.Label(self, text='XML Klasörü:').grid(row=3, column=0, sticky='w', pady=(PADDING['small'], 0))
+        ttk.Entry(self, textvariable=self.xml_folder_var).grid(
+            row=3, column=1, columnspan=5, sticky='ew', padx=6, pady=(PADDING['small'], 0))
+        ttk.Button(self, text='📂 Klasör Seç', command=self._browse_xml_folder).grid(
+            row=3, column=6, sticky='w', pady=(PADDING['small'], 0))
 
-        log_frame = ttk.LabelFrame(self, text='📋 Log', style='TLabelframe', padding=PADDING['medium'])
-        log_frame.pack(fill='both', expand=True, padx=12, pady=(0, PADDING['medium']))
+        ttk.Label(self, text='Excel Dosyaları:').grid(row=4, column=0, sticky='w')
+        ttk.Entry(self, textvariable=self.excel_files_var).grid(
+            row=4, column=1, columnspan=5, sticky='ew', padx=6)
+        ttk.Button(self, text='📄 Dosya Seç', command=self._browse_excel_files).grid(row=4, column=6, sticky='w')
+
+        options = ttk.Frame(self, style='Card.TFrame')
+        options.grid(row=5, column=0, columnspan=root_cols, sticky='ew', pady=(PADDING['small'], 0))
+        ttk.Label(options, text='Tutar toleransı (TL):', style='Card.TLabel').grid(
+            row=0, column=0, sticky='w', padx=(PADDING['medium'], PADDING['xs']), pady=(PADDING['xs'], PADDING['xs']))
+        ttk.Entry(options, textvariable=self.amount_tolerance, width=10).grid(
+            row=0, column=1, sticky='w', pady=(PADDING['xs'], PADDING['xs']))
+        ttk.Label(options, text='Boş bırakılırsa tutar karşılaştırması yapılmaz.', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).grid(row=0, column=2, sticky='w')
+
+        btn_row = ttk.Frame(self, style='Card.TFrame')
+        btn_row.grid(row=6, column=0, columnspan=root_cols, sticky='ew', pady=PADDING['medium'])
+        self.btn_start = ttk.Button(btn_row, text='🚀 Başlat', style='Accent.TButton', command=self._start_process)
+        self.btn_start.pack(side='left', padx=5)
+        self.btn_stop = ttk.Button(btn_row, text='⏹ Durdur', style='Warning.TButton',
+                                   command=self._stop_process, state='disabled')
+        self.btn_stop.pack(side='left', padx=5)
+        self.btn_restart = ttk.Button(btn_row, text='🔄 Yeniden', style='Secondary.TButton',
+                                      command=self._restart_process, state='disabled')
+        self.btn_restart.pack(side='left', padx=5)
+        ttk.Button(btn_row, text='📁 Klasöre Git', command=self._open_output_folder).pack(side='right', padx=5)
+
+        log_frame = ttk.Frame(self, style='Card.TFrame')
+        log_frame.grid(row=7, column=0, columnspan=root_cols, sticky='nsew', pady=(0, PADDING['medium']))
         log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
+        log_frame.rowconfigure(1, weight=1)
 
+        ttk.Label(log_frame, text='Log Kayıtları', style='Title.TLabel').grid(
+            row=0, column=0, sticky='w', padx=12, pady=(12, 0))
         self.log = scrolledtext.ScrolledText(log_frame, height=18, wrap='word')
-        self.log.grid(row=0, column=0, sticky='nsew')
+        self.log.grid(row=1, column=0, sticky='nsew', padx=12, pady=12)
         style_scrolled_text(self.log)
         try:
             top = self.winfo_toplevel()
@@ -2543,17 +2537,89 @@ class XMLMatcherTab(ttk.Frame):
         except Exception:
             pass
 
+        self.rowconfigure(7, weight=1)
+
+    def _on_api_change(self, _=None):
+        api_name = self.api_cb.get()
+        if api_name in self.apis:
+            apply_api(self.apis[api_name], self.headers)
+            self.settings['last_xml_api'] = api_name
+            save_settings(self.settings)
+
+    def _guard_api(self) -> bool:
+        api_name = self.api_cb.get()
+        return api_name in self.apis and bool((self.apis.get(api_name) or '').strip())
+
     def _browse_xml_folder(self):
         folder = filedialog.askdirectory(title='XML klasörü seç')
         if folder:
             self.xml_folder_var.set(folder)
+            self.settings['last_xml_folder'] = folder
+            save_settings(self.settings)
 
     def _browse_excel_files(self):
         files = filedialog.askopenfilenames(filetypes=[('Excel Dosyaları', '*.xlsx')])
         if files:
-            self.excel_files_var.set(';'.join(files))
+            joined = ';'.join(files)
+            self.excel_files_var.set(joined)
+            self.settings['last_xml_excel'] = joined
+            save_settings(self.settings)
 
-    def _start(self):
+    def _fetch_incoming_xmls(self):
+        if requests is None:
+            messagebox.showerror('Eksik Bağımlılık', "requests yüklü değil.\nKomut: pip install requests")
+            return
+        if not self._guard_api():
+            messagebox.showwarning('API Gerekli', 'Önce bir API hesabı seçiniz / ekleyiniz.')
+            return
+        if not self.invoice_tab_ref.save_folder:
+            base = filedialog.askdirectory(title='İndirme için ana klasör seçin')
+            if not base:
+                return
+            self.invoice_tab_ref.save_folder = base
+            self.invoice_tab_ref.folder_label.config(text=f'Klasör: {base}')
+            self.invoice_tab_ref.settings['invoice_folder'] = base
+            save_settings(self.invoice_tab_ref.settings)
+
+        try:
+            y = int(self.year.get()); m = int(self.month.get())
+        except Exception:
+            messagebox.showerror('Hata', 'Geçerli yıl/ay seçiniz.')
+            return
+
+        api_name = self.api_cb.get()
+        apply_api(self.apis.get(api_name, ''), self.headers)
+
+        today = datetime.now().strftime('%d.%m.%Y')
+        sd = datetime(y, m, 1).strftime('%Y-%m-%dT00:00:00+03:00')
+        ed = datetime(y, m, calendar.monthrange(y, m)[1], 23, 59, 59).strftime('%Y-%m-%dT%H:%M:%S+03:00')
+
+        folder_name = f"{api_name} {int(m)}. ay {today} GelenXML"
+        base = os.path.join(self.invoice_tab_ref.save_folder, folder_name)
+        os.makedirs(base, exist_ok=True)
+
+        url = BASE_URLS['e-Fatura Gelen']
+        invs = self.invoice_tab_ref._get_invoices(url, sd, ed)
+        key = 'e-Fatura Gelen'
+
+        for inv in invs:
+            num, uid = inv.get('documentNumber') or inv.get('id'), inv.get('id')
+            if not num or not uid:
+                continue
+            d = os.path.join(base, 'xml'); os.makedirs(d, exist_ok=True)
+            r = requests.get(f"{BASE_URLS[key]}/{uid}/xml", headers=self.headers)
+            if r.status_code == 200:
+                with open(os.path.join(d, f"{num}.xml"), 'wb') as f:
+                    f.write(r.content)
+
+        xml_path = os.path.join(base, 'xml')
+        self.xml_folder_var.set(xml_path)
+        self.settings['last_xml_folder'] = xml_path
+        save_settings(self.settings)
+        self._log(f"✅ e-Fatura Gelen XML indirildi. Klasör: {xml_path}")
+        webbrowser.open(base)
+
+    def _start_process(self):
         xml_folder = self.xml_folder_var.get().strip()
         excel_paths = [p for p in self.excel_files_var.get().split(';') if p.strip()]
         if not xml_folder or not os.path.isdir(xml_folder):
@@ -2562,6 +2628,11 @@ class XMLMatcherTab(ttk.Frame):
         if not excel_paths:
             messagebox.showerror('Hata', 'Lütfen en az bir Excel dosyası seçiniz.')
             return
+
+        self.settings['last_xml_folder'] = xml_folder
+        self.settings['last_xml_excel'] = ';'.join(excel_paths)
+        self.settings['xml_amount_tolerance'] = self.amount_tolerance.get()
+        save_settings(self.settings)
 
         self.stop_event.clear()
         self.log_delete()
@@ -2576,12 +2647,12 @@ class XMLMatcherTab(ttk.Frame):
         self.worker = threading.Thread(target=self._run_process, args=(xml_folder, excel_paths), daemon=True)
         self.worker.start()
 
-    def _stop(self):
+    def _stop_process(self):
         self.stop_event.set()
         self._log('\n❌ İşlem durdurma talebi alındı.')
         self.btn_stop.config(state='disabled')
 
-    def _restart(self):
+    def _restart_process(self):
         if not self.last_params:
             messagebox.showinfo('Bilgi', 'Önce bir işlem başlatın.')
             return
@@ -2596,7 +2667,7 @@ class XMLMatcherTab(ttk.Frame):
         self.worker = threading.Thread(target=self._run_process, args=self.last_params, daemon=True)
         self.worker.start()
 
-    def _open_output(self):
+    def _open_output_folder(self):
         if self.output_dir and os.path.exists(self.output_dir):
             webbrowser.open(self.output_dir)
         else:
@@ -2614,7 +2685,8 @@ class XMLMatcherTab(ttk.Frame):
             return
 
         try:
-            tolerance = float(self.amount_tolerance.get().replace(',', '.')) if self.amount_tolerance.get().strip() else None
+            tol_raw = self.amount_tolerance.get().replace(',', '.')
+            tolerance = float(tol_raw) if tol_raw.strip() else None
         except Exception:
             tolerance = None
             self._log('⚠️ Tolerans değeri okunamadı, tutar karşılaştırması yapılmayacak.')
@@ -2630,7 +2702,7 @@ class XMLMatcherTab(ttk.Frame):
                 self._finalize()
                 return
             self._log(f"📥 Excel işleniyor: {os.path.basename(excel_path)}")
-            df = read_excel_with_dynamic_header(excel_path, keywords=("Seri",))
+            df = read_excel_with_dynamic_header(excel_path, keywords=('Seri',))
             if df is None:
                 self._log('⚠️ Uygun başlık bulunamadı. "Seri" başlığını içeren bir sayfa bekleniyor.')
                 continue
@@ -2731,7 +2803,6 @@ class XMLMatcherTab(ttk.Frame):
 
     def log_delete(self):
         self.log.delete('1.0', tk.END)
-
 # ========================== BÖLÜM 2/2 – DEVAM ===========================
 # ------------------- Envanter Yardımcıları & Sekmesi --------------------
 
@@ -3958,14 +4029,15 @@ class MainApp(tk.Tk):
         except Exception:
             self.geometry("1280x860")
         self.minsize(1024, 700)
-
-        # Modern Header Bar
-        topbar = ttk.Frame(self, style="Elevated.TFrame", padding=PADDING['medium'])
-        topbar.pack(fill="x", padx=PADDING['medium'], pady=PADDING['small'])
-
-        # Modern Logo Section
-        logo_frame = ttk.Frame(topbar, style="Card.TFrame")
-        logo_frame.pack(side='left')
+        
+        # Immersive hero header
+        hero = ttk.Frame(self, style='Hero.TFrame', padding=(PADDING['large'], PADDING['medium']))
+        hero.pack(fill='x', padx=PADDING['large'], pady=(PADDING['medium'], PADDING['small']))
+        hero.columnconfigure(0, weight=1)
+        hero.columnconfigure(1, weight=0)
+        
+        branding = ttk.Frame(hero, style='Hero.TFrame')
+        branding.grid(row=0, column=0, sticky='w')
         
         if HAS_PIL:
             try:
@@ -3976,48 +4048,69 @@ class MainApp(tk.Tk):
                     if logo_path.exists():
                         _img = Image.open(str(logo_path)).resize((140, 42), Image.LANCZOS)
                         self._logo_img = ImageTk.PhotoImage(_img)
-                        tk.Label(logo_frame, image=self._logo_img, bg=COLORS['card']).pack(side='left', padx=(0, PADDING['medium']))
+                        ttk.Label(branding, image=self._logo_img, style='HeroImage.TLabel').pack(anchor='w', pady=(0, PADDING['small']))
                         break
             except Exception:
                 pass
-
-        # Modern Title Section
-        title_frame = ttk.Frame(topbar, style="Card.TFrame")
-        title_frame.pack(side='left', padx=(0, PADDING['xlarge']))
         
-        ttk.Label(title_frame, text="🚀 NES Toolkit", style="LargeTitle.TLabel").pack(side="left")
-        version_label = ttk.Label(title_frame, text="v3.1 Modern", 
-                                 background=COLORS['card'], foreground=COLORS['accent'],
-                                 font=('Segoe UI', 9, 'bold'))
-        version_label.pack(side="left", padx=(PADDING['small'], 0))
-
-        # Modern Control Section (right side)
-        controls_frame = ttk.Frame(topbar, style="Card.TFrame")
-        controls_frame.pack(side='right')
+        ttk.Label(branding, text='NES Toolkit', style='HeroTitle.TLabel').pack(anchor='w')
+        ttk.Label(
+            branding,
+            text='Dijital fatura, PDF/XML eşleştirme ve envanter raporları tek panelde.',
+            style='HeroSub.TLabel'
+        ).pack(anchor='w', pady=(4, 0))
         
-        # Modern theme toggle
-        self._dark_var = tk.BooleanVar(value=(self.settings.get('theme','dark')=='dark'))
-        def _toggle_theme():
+        badge_row = ttk.Frame(branding, style='Hero.TFrame')
+        badge_row.pack(anchor='w', pady=(PADDING['small'], 0))
+        ttk.Label(badge_row, text='⚡ Otomatik Ayar Kaydı', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_row, text='🌓 Modern Koyu Tema', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_row, text='🧾 PDF/XML Uyumlu', style='HeroBadge.TLabel').pack(side='left')
+        
+        controls = ttk.Frame(hero, style='Hero.TFrame')
+        controls.grid(row=0, column=1, sticky='ne', padx=(PADDING['large'], 0))
+        
+        self._dark_var = tk.BooleanVar(value=(self.settings.get('theme', 'dark') == 'dark'))
+        
+        def update_theme_button():
+            icon = '🌙' if self._dark_var.get() else '☀️'
+            label = 'Koyu Tema Aktif' if self._dark_var.get() else 'Aydınlık Tema Aktif'
+            theme_btn.config(text=f"{icon}  {label}")
+        
+        def _apply_theme_state():
             global COLORS
             self.settings['theme'] = 'dark' if self._dark_var.get() else 'light'
             COLORS = DARK_COLORS.copy() if self._dark_var.get() else LIGHT_COLORS.copy()
             save_settings(self.settings)
-            # Reapply theme completely
             self.style = apply_modern_theme(self, self.style)
-            # ScrolledText alanlarını da yeniden boya
             for w in getattr(self, '_styled_texts', []):
                 style_scrolled_text(w)
-            # Listbox'ları yeniden boya
             for lb in getattr(self, '_styled_listboxes', []):
                 style_listbox(lb)
-            # Update window background
             self.configure(background=COLORS['background'])
-
-        ttk.Button(controls_frame, text="📁  Klasör Aç", style='TButton', 
-                  command=lambda: webbrowser.open(os.getcwd())).pack(side="right", padx=PADDING['small'])
-        ttk.Checkbutton(controls_frame, text="🌙  Koyu Tema", variable=self._dark_var, 
-                       command=_toggle_theme).pack(side='right', padx=PADDING['medium'])
-
+            update_theme_button()
+        
+        def _toggle_theme():
+            self._dark_var.set(not self._dark_var.get())
+            _apply_theme_state()
+        
+        theme_btn = ttk.Button(controls, text='', style='Secondary.TButton', command=_toggle_theme)
+        theme_btn.pack(fill='x', pady=(0, PADDING['xs']))
+        
+        ttk.Button(controls, text='📁 Çalışma Klasörü', style='TButton',
+                  command=lambda: webbrowser.open(os.getcwd())).pack(fill='x', pady=(PADDING['xs'], PADDING['xs']))
+        ttk.Button(controls, text='ℹ️  Hakkımızda', style='Accent.TButton',
+                  command=lambda: self.show_tab('about')).pack(fill='x', pady=(PADDING['xs'], 0))
+        
+        update_theme_button()
+        
+        workspace = ttk.Frame(self, style='Surface.TFrame', padding=PADDING['large'])
+        workspace.pack(fill='both', expand=True)
+        
+        notebook_container = ttk.Frame(workspace, style='Card.TFrame', padding=PADDING['large'])
+        notebook_container.pack(fill='both', expand=True)
+        
+        self.notebook = ttk.Notebook(notebook_container)
+        self.notebook.pack(fill='both', expand=True)
         # ScrolledText kayıt listesi (tema değişince yeniden boyamak için)
         self._styled_texts: List[tk.Text] = []
         def register_text_widget(w):
@@ -4036,15 +4129,11 @@ class MainApp(tk.Tk):
         self.apis = load_apis()
         self.headers = {}
 
-        # Notebook
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill='both', expand=True, padx=PADDING['medium'], pady=PADDING['small'])
-
         # Sekmeler
         self.invoice_tab = InvoiceTab(self.notebook, self.apis, self.headers)
         self.report_tab  = ReportTab(self.notebook, self.apis, self.headers)
         self.pdf_tab     = PDFMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
-        self.xml_tab     = XMLMatcherTab(self.notebook)
+        self.xml_tab     = XMLMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
         self.inv_tab     = InventoryTab(self.notebook)
         self.about_tab   = AboutTab(self.notebook)
 
