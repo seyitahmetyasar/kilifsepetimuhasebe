@@ -2574,7 +2574,8 @@ class XMLMatcherTab(ttk.Frame):
         top_shell = ttk.Frame(paned, style='Surface.TFrame', padding=PADDING['large'])
         top_shell.columnconfigure(0, weight=1)
         top_shell.rowconfigure(0, weight=1)
-        paned.add(top_shell, weight=3, minsize=320)
+        paned.add(top_shell)
+        self._safe_configure_pane(paned, top_shell, weight=3, minsize=320)
 
         content = ttk.Frame(top_shell, style='Surface.TFrame', padding=PADDING['medium'])
         content.grid(row=0, column=0, sticky='nsew')
@@ -2674,7 +2675,8 @@ class XMLMatcherTab(ttk.Frame):
         log_card = ttk.Frame(paned, style='Card.TFrame', padding=PADDING['medium'])
         log_card.columnconfigure(0, weight=1)
         log_card.rowconfigure(1, weight=1)
-        paned.add(log_card, weight=2, minsize=220)
+        paned.add(log_card)
+        self._safe_configure_pane(paned, log_card, weight=2, minsize=220)
 
         log_toolbar = ttk.Frame(log_card, style='Card.TFrame')
         log_toolbar.grid(row=0, column=0, sticky='ew', pady=(0, PADDING['xs']))
@@ -2996,6 +2998,19 @@ class XMLMatcherTab(ttk.Frame):
             height = paned.winfo_height()
             if height > 0:
                 paned.sashpos(0, int(height * 0.6))
+        except Exception:
+            pass
+
+    def _safe_configure_pane(self, paned: ttk.Panedwindow, child: tk.Widget, **options):
+        if not options:
+            return
+        try:
+            paned.pane(child, **options)
+            return
+        except Exception:
+            pass
+        try:
+            paned.itemconfigure(child, **options)  # type: ignore[attr-defined]
         except Exception:
             pass
 # ========================== BÖLÜM 2/2 – DEVAM ===========================
