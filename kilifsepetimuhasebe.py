@@ -2574,7 +2574,7 @@ class XMLMatcherTab(ttk.Frame):
         top_shell = ttk.Frame(paned, style='Surface.TFrame', padding=PADDING['large'])
         top_shell.columnconfigure(0, weight=1)
         top_shell.rowconfigure(0, weight=1)
-        paned.add(top_shell, weight=3)
+        paned.add(top_shell, weight=3, minsize=320)
 
         content = ttk.Frame(top_shell, style='Surface.TFrame', padding=PADDING['medium'])
         content.grid(row=0, column=0, sticky='nsew')
@@ -2674,7 +2674,7 @@ class XMLMatcherTab(ttk.Frame):
         log_card = ttk.Frame(paned, style='Card.TFrame', padding=PADDING['medium'])
         log_card.columnconfigure(0, weight=1)
         log_card.rowconfigure(1, weight=1)
-        paned.add(log_card, weight=2)
+        paned.add(log_card, weight=2, minsize=220)
 
         log_toolbar = ttk.Frame(log_card, style='Card.TFrame')
         log_toolbar.grid(row=0, column=0, sticky='ew', pady=(0, PADDING['xs']))
@@ -2695,8 +2695,6 @@ class XMLMatcherTab(ttk.Frame):
         except Exception:
             pass
 
-        paned.paneconfigure(top_shell, weight=3, minsize=320)
-        paned.paneconfigure(log_card, weight=2, minsize=220)
         self.after(200, lambda: self._set_initial_pane_sizes(paned))
 
     def _on_api_change(self, _=None):
