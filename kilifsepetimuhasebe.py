@@ -210,7 +210,7 @@ def apply_modern_theme(root, existing_style=None):
     button_font = (base_family, 11, 'bold')
 
     global LOG_FONT
-    LOG_FONT = (mono_family, 11)
+    LOG_FONT = (mono_family, 12)
 
     # Layered frames & containers
     style.configure('TFrame', background=COLORS['background'], relief='flat', borderwidth=0)
@@ -2048,7 +2048,63 @@ def find_pdf_containing_serial(serial, pdf_texts: dict):
 
 
 def _normalize_identifier(value: str) -> str:
-    return re.sub(r"[^A-Z0-9]", "", normalize_text(value))
+    raw = "" if value is None else str(value).strip()
+    if not raw:
+        return ""
+
+    cleaned = normalize_text(raw)
+    cleaned = cleaned.replace(",", ".")
+
+    # Bilimsel gösterim veya yüksek basamaklı sayılar için dönüştürme
+    sci = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)E\+?([0-9]+)", cleaned, re.IGNORECASE)
+    if sci:
+        mantissa, exponent = sci.groups()
+        digits = re.sub(r"[^0-9]", "", mantissa)
+        decimal_places = len(mantissa.split(".")[-1]) if "." in mantissa else 0
+        zeros = int(exponent) - decimal_places
+        if zeros >= 0:
+            cleaned = digits + ("0" * zeros)
+        else:
+            cleaned = digits[:zeros]
+    else:
+        # 1.234.567,00 benzeri değerler
+        if re.fullmatch(r"[0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?", raw):
+            numeric = raw.replace('.', '').replace(',', '.')
+            cleaned = numeric
+
+        if cleaned.count('.') == 1 and cleaned.replace('.', '').isdigit():
+            int_part, frac_part = cleaned.split('.')
+            if set(frac_part) <= {'0'}:
+                cleaned = int_part
+            else:
+                cleaned = int_part + frac_part
+        elif cleaned.replace('.', '').isdigit() and cleaned.count('.') > 1:
+            cleaned = cleaned.replace('.', '')
+
+    return re.sub(r"[^A-Z0-9]", "", cleaned)
+
+
+def identifier_variants(value: str) -> List[str]:
+    variants: List[str] = []
+    raw = "" if value is None else str(value)
+
+    primary = _normalize_identifier(raw)
+    if primary:
+        variants.append(primary)
+        if primary.isdigit():
+            trimmed = primary.lstrip('0')
+            if trimmed and trimmed not in variants:
+                variants.append(trimmed)
+
+    digits_only = re.sub(r"[^0-9]", "", raw)
+    if digits_only and digits_only not in variants:
+        variants.append(digits_only)
+    if digits_only:
+        trimmed_digits = digits_only.lstrip('0')
+        if trimmed_digits and trimmed_digits not in variants:
+            variants.append(trimmed_digits)
+
+    return [v for i, v in enumerate(variants) if v and v not in variants[:i]]
 
 
 SERIAL_KEYWORDS = (
@@ -2175,10 +2231,8 @@ def build_xml_index(xml_folder: Path) -> Tuple[Dict[str, List[str]], Dict[str, D
         info['file'] = rel_name
         meta[rel_name] = info
         for ident in ids:
-            norm = _normalize_identifier(ident)
-            if not norm:
-                continue
-            index.setdefault(norm, set()).add(rel_name)
+            for key in identifier_variants(ident):
+                index.setdefault(key, set()).add(rel_name)
 
     normalized_index: Dict[str, List[str]] = {k: sorted(v) for k, v in index.items()}
     return normalized_index, meta
@@ -2546,26 +2600,30 @@ class XMLMatcherTab(ttk.Frame):
         self.amount_tolerance = tk.StringVar(value=self.settings.get('xml_amount_tolerance', '1.0'))
 
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
-        hero = ttk.Frame(self, style='Hero.TFrame', padding=PADDING['xlarge'])
-        hero.grid(row=0, column=0, sticky='ew')
-        hero.columnconfigure(0, weight=1)
-        ttk.Label(hero, text='🧾 XML Eşleştirici', style='HeroTitle.TLabel').grid(row=0, column=0, sticky='w')
+        header = ttk.Frame(self, style='Surface.TFrame', padding=(PADDING['xlarge'], PADDING['large']))
+        header.grid(row=0, column=0, sticky='ew')
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text='🧾 XML Eşleştirici', style='LargeTitle.TLabel').grid(row=0, column=0, sticky='w')
         ttk.Label(
-            hero,
-            text='UBL XML faturalarını Excel listeleriyle saniyeler içinde eşleştirin, tutar farklarını görün ve rapor alın.',
-            style='HeroSub.TLabel'
+            header,
+            text='UBL XML faturalarını Excel listeleriyle saniyeler içinde eşleştirin, canlı log ile süreci takip edin.',
+            style='Card.TLabel',
+            foreground=COLORS['text_muted']
         ).grid(row=1, column=0, sticky='w', pady=(PADDING['xs'], 0))
 
-        badge_bar = ttk.Frame(hero, style='Hero.TFrame')
-        badge_bar.grid(row=2, column=0, sticky='w', pady=(PADDING['small'], 0))
-        ttk.Label(badge_bar, text='Canlı Log', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
-        ttk.Label(badge_bar, text='Seri No analizi', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
-        ttk.Label(badge_bar, text='Excel karşılaştırma', style='HeroBadge.TLabel').pack(side='left')
+        quick_actions = ttk.Frame(header, style='Surface.TFrame')
+        quick_actions.grid(row=0, column=1, rowspan=2, sticky='e')
+        ttk.Label(quick_actions, text='⚡ Gerçek zamanlı analiz', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).pack(anchor='e')
+        ttk.Label(quick_actions, text='🗂 Yeniden boyutlanabilir paneller', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).pack(anchor='e')
+
+        ttk.Separator(self, orient='horizontal').grid(row=1, column=0, sticky='ew')
 
         paned = ttk.Panedwindow(self, orient='vertical')
-        paned.grid(row=1, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        paned.grid(row=2, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
         try:
             paned.configure(sashrelief='flat', sashwidth=14)
         except tk.TclError:
@@ -2577,39 +2635,44 @@ class XMLMatcherTab(ttk.Frame):
         paned.add(top_shell)
         self._safe_configure_pane(paned, top_shell, weight=3, minsize=320)
 
-        content = ttk.Frame(top_shell, style='Surface.TFrame', padding=PADDING['medium'])
+        content = ttk.Frame(top_shell, style='Surface.TFrame', padding=(PADDING['large'], PADDING['medium']))
         content.grid(row=0, column=0, sticky='nsew')
         content.columnconfigure(0, weight=1)
         content.columnconfigure(1, weight=1)
+        content.rowconfigure(0, weight=1)
 
-        sources_card = ttk.LabelFrame(content, text='Veri Kaynakları', style='TLabelframe', padding=PADDING['medium'])
+        sources_card = ttk.Frame(content, style='Card.TFrame', padding=PADDING['large'])
         sources_card.grid(row=0, column=0, sticky='nsew', padx=(0, PADDING['medium']))
         sources_card.columnconfigure(0, weight=1)
+        ttk.Label(sources_card, text='Veri Kaynakları', style='Title.TLabel').grid(row=0, column=0, columnspan=2, sticky='w')
+        ttk.Label(
+            sources_card,
+            text='XML klasörünüzü seçin veya hazır klasör listesini içeri aktarın. Birden fazla Excel dosyası için ; kullanın.',
+            style='Card.TLabel',
+            foreground=COLORS['text_muted']
+        ).grid(row=1, column=0, columnspan=2, sticky='w', pady=(PADDING['xs'], PADDING['medium']))
 
-        ttk.Label(sources_card, text='XML klasörünü seçin veya otomatik indirin.', style='Card.TLabel',
-                  foreground=COLORS['text_muted']).pack(anchor='w')
+        ttk.Entry(sources_card, textvariable=self.xml_folder_var).grid(row=2, column=0, sticky='ew')
+        ttk.Button(sources_card, text='📂 Klasör Seç', command=self._browse_xml_folder).grid(
+            row=2, column=1, sticky='w', padx=(PADDING['small'], 0))
 
-        xml_row = ttk.Frame(sources_card, style='Card.TFrame')
-        xml_row.pack(fill='x', pady=(PADDING['small'], 0))
-        ttk.Entry(xml_row, textvariable=self.xml_folder_var).pack(side='left', fill='x', expand=True)
-        ttk.Button(xml_row, text='📂 Klasör Seç', command=self._browse_xml_folder).pack(side='left', padx=(PADDING['small'], 0))
+        ttk.Entry(sources_card, textvariable=self.excel_files_var).grid(row=3, column=0, sticky='ew', pady=(PADDING['small'], 0))
+        ttk.Button(sources_card, text='📄 Dosya Seç', command=self._browse_excel_files).grid(
+            row=3, column=1, sticky='w', padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
 
-        excel_row = ttk.Frame(sources_card, style='Card.TFrame')
-        excel_row.pack(fill='x', pady=(PADDING['small'], 0))
-        ttk.Entry(excel_row, textvariable=self.excel_files_var).pack(side='left', fill='x', expand=True)
-        ttk.Button(excel_row, text='📄 Dosya Seç', command=self._browse_excel_files).pack(side='left', padx=(PADDING['small'], 0))
-
-        ttk.Label(sources_card, text='Birden fazla Excel seçimi için ; ile ayrılmış yol listesi kullanılır.',
-                  style='Card.TLabel', foreground=COLORS['text_muted']).pack(anchor='w', pady=(PADDING['small'], 0))
-
-        download_card = ttk.LabelFrame(content, text='e-Fatura Gelen XML İndir', style='TLabelframe', padding=PADDING['medium'])
+        download_card = ttk.Frame(content, style='Card.TFrame', padding=PADDING['large'])
         download_card.grid(row=0, column=1, sticky='nsew')
         download_card.columnconfigure(1, weight=1)
+        ttk.Label(download_card, text='e-Fatura Gelen XML İndir', style='Title.TLabel').grid(
+            row=0, column=0, columnspan=2, sticky='w')
+        ttk.Label(download_card, text='API hesabınızı seçin, ilgili dönem için gelen faturaları tek tıkla alın.',
+                  style='Card.TLabel', foreground=COLORS['text_muted']).grid(
+            row=1, column=0, columnspan=2, sticky='w', pady=(PADDING['xs'], PADDING['medium']))
 
-        ttk.Label(download_card, text='API Hesabı:', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Label(download_card, text='API Hesabı', style='Card.TLabel').grid(row=2, column=0, sticky='w')
         self.api_var = tk.StringVar()
         self.api_cb = ttk.Combobox(download_card, values=list(apis.keys()), textvariable=self.api_var, state='readonly')
-        self.api_cb.grid(row=0, column=1, sticky='ew', padx=(PADDING['small'], 0))
+        self.api_cb.grid(row=2, column=1, sticky='ew')
 
         if apis:
             last_api = self.settings.get('last_xml_api') or self.settings.get('last_api', '')
@@ -2624,17 +2687,17 @@ class XMLMatcherTab(ttk.Frame):
         self.api_cb.bind('<<ComboboxSelected>>', self._on_api_change)
 
         now = datetime.now()
-        ttk.Label(download_card, text='Yıl:', style='Card.TLabel').grid(row=1, column=0, sticky='w', pady=(PADDING['small'], 0))
         years = [str(now.year + i) for i in range(-10, 15)]
+        ttk.Label(download_card, text='Yıl', style='Card.TLabel').grid(row=3, column=0, sticky='w', pady=(PADDING['small'], 0))
         self.year = ttk.Combobox(download_card, values=years, width=6, state='readonly')
         self.year.set(str(now.year))
-        self.year.grid(row=1, column=1, sticky='w', padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
+        self.year.grid(row=3, column=1, sticky='w', pady=(PADDING['small'], 0))
         self.year.configure(background=COLORS['card'], foreground=COLORS['text'])
 
-        ttk.Label(download_card, text='Ay:', style='Card.TLabel').grid(row=2, column=0, sticky='w')
+        ttk.Label(download_card, text='Ay', style='Card.TLabel').grid(row=4, column=0, sticky='w')
         self.month = ttk.Combobox(download_card, values=[f"{i:02d}" for i in range(1, 13)], width=4, state='readonly')
         self.month.set(f"{now.month:02d}")
-        self.month.grid(row=2, column=1, sticky='w', padx=(PADDING['small'], 0))
+        self.month.grid(row=4, column=1, sticky='w')
         self.month.configure(background=COLORS['card'], foreground=COLORS['text'])
 
         self.btn_fetch_incoming = ttk.Button(
@@ -2643,18 +2706,19 @@ class XMLMatcherTab(ttk.Frame):
             style='Accent.TButton',
             command=self._fetch_incoming_xmls
         )
-        self.btn_fetch_incoming.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(PADDING['medium'], 0))
+        self.btn_fetch_incoming.grid(row=5, column=0, columnspan=2, sticky='ew', pady=(PADDING['medium'], 0))
 
-        options_card = ttk.LabelFrame(top_shell, text='Eşleştirme Ayarları', style='TLabelframe', padding=PADDING['medium'])
+        options_card = ttk.Frame(top_shell, style='Card.TFrame', padding=PADDING['large'])
         options_card.grid(row=1, column=0, sticky='ew', pady=(PADDING['medium'], 0))
         options_card.columnconfigure(1, weight=1)
-        ttk.Label(options_card, text='Tutar toleransı (TL):', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Label(options_card, text='Eşleştirme Ayarları', style='Title.TLabel').grid(row=0, column=0, sticky='w', columnspan=3)
+        ttk.Label(options_card, text='Tutar toleransı (TL)', style='Card.TLabel').grid(row=1, column=0, sticky='w', pady=(PADDING['small'], 0))
         ttk.Entry(options_card, textvariable=self.amount_tolerance, width=12).grid(
-            row=0, column=1, sticky='w', padx=(PADDING['small'], PADDING['small']))
+            row=1, column=1, sticky='w', padx=(PADDING['small'], PADDING['small']))
         ttk.Label(options_card, text='Boş bırakılırsa tutar karşılaştırması yapılmaz.', style='Card.TLabel',
-                  foreground=COLORS['text_muted']).grid(row=0, column=2, sticky='w')
+                  foreground=COLORS['text_muted']).grid(row=1, column=2, sticky='w')
 
-        actions_card = ttk.Frame(top_shell, style='Card.TFrame', padding=PADDING['medium'])
+        actions_card = ttk.Frame(top_shell, style='Card.TFrame', padding=PADDING['large'])
         actions_card.grid(row=2, column=0, sticky='ew', pady=(PADDING['medium'], 0))
         actions_card.columnconfigure(0, weight=1)
 
@@ -2672,23 +2736,25 @@ class XMLMatcherTab(ttk.Frame):
         ttk.Button(actions_card, text='📁 Çıktı Klasörünü Aç', command=self._open_output_folder).grid(
             row=0, column=1, sticky='e')
 
-        log_card = ttk.Frame(paned, style='Card.TFrame', padding=PADDING['medium'])
+        log_card = ttk.Frame(paned, style='Surface.TFrame', padding=(PADDING['large'], PADDING['large']))
         log_card.columnconfigure(0, weight=1)
         log_card.rowconfigure(1, weight=1)
         paned.add(log_card)
-        self._safe_configure_pane(paned, log_card, weight=2, minsize=220)
+        self._safe_configure_pane(paned, log_card, weight=2, minsize=260)
 
-        log_toolbar = ttk.Frame(log_card, style='Card.TFrame')
-        log_toolbar.grid(row=0, column=0, sticky='ew', pady=(0, PADDING['xs']))
+        log_toolbar = ttk.Frame(log_card, style='Surface.TFrame')
+        log_toolbar.grid(row=0, column=0, sticky='ew', pady=(0, PADDING['small']))
         log_toolbar.columnconfigure(0, weight=1)
-        ttk.Label(log_toolbar, text='Canlı Log', style='Title.TLabel').grid(row=0, column=0, sticky='w', padx=(12, 0))
-        ttk.Button(log_toolbar, text='🧹 Temizle', style='Secondary.TButton', command=self.log_delete).grid(
-            row=0, column=1, padx=(PADDING['small'], 0))
-        ttk.Button(log_toolbar, text='📋 Kopyala', style='Secondary.TButton',
-                   command=self._copy_log_to_clipboard).grid(row=0, column=2, padx=(PADDING['small'], 12))
+        ttk.Label(log_toolbar, text='Canlı Log', style='Title.TLabel').grid(row=0, column=0, sticky='w')
+        toolbar_actions = ttk.Frame(log_toolbar, style='Surface.TFrame')
+        toolbar_actions.grid(row=0, column=1, sticky='e')
+        ttk.Button(toolbar_actions, text='🧹 Temizle', style='Secondary.TButton', command=self.log_delete).pack(
+            side='left', padx=(0, PADDING['small']))
+        ttk.Button(toolbar_actions, text='📋 Kopyala', style='Secondary.TButton',
+                   command=self._copy_log_to_clipboard).pack(side='left')
 
-        self.log = scrolledtext.ScrolledText(log_card, height=16, wrap='word')
-        self.log.grid(row=1, column=0, sticky='nsew', padx=12, pady=(0, 0))
+        self.log = scrolledtext.ScrolledText(log_card, height=22, wrap='word')
+        self.log.grid(row=1, column=0, sticky='nsew')
         style_scrolled_text(self.log)
         try:
             top = self.winfo_toplevel()
@@ -2860,6 +2926,7 @@ class XMLMatcherTab(ttk.Frame):
             matched_records: List[Dict[str, object]] = []
             unmatched_records: List[Dict[str, object]] = []
             matched_xml_files: set = set()
+            logged_ambiguities: Set[str] = set()
             total_rows = 0
 
             for excel_path in excel_paths:
@@ -2893,12 +2960,21 @@ class XMLMatcherTab(ttk.Frame):
                         self._log('🛑 Kullanıcı durdurdu; satır taraması sona eriyor.')
                         return
                     seri_val = str(row.get(seri_col, '')).strip()
-                    norm = _normalize_identifier(seri_val)
-                    if not norm:
+                    variant_keys = identifier_variants(seri_val)
+                    if not variant_keys:
                         continue
-                    candidates = index.get(norm, [])
-                    if candidates:
-                        xml_file = candidates[0]
+                    found_matches: List[str] = []
+                    match_key: Optional[str] = None
+                    for key in variant_keys:
+                        matches = index.get(key, [])
+                        if matches and match_key is None:
+                            match_key = key
+                        for xml_file in matches:
+                            if xml_file not in found_matches:
+                                found_matches.append(xml_file)
+
+                    if len(found_matches) == 1 and match_key:
+                        xml_file = found_matches[0]
                         matched_xml_files.add(xml_file)
                         info = xml_meta.get(xml_file, {})
                         excel_amount = None
@@ -2927,12 +3003,28 @@ class XMLMatcherTab(ttk.Frame):
                             'Müşteri': info.get('customer'),
                             'Tedarikçi': info.get('supplier'),
                             'XML Seri Bilgileri': ', '.join(info.get('serials', [])) or None,
+                            'Eşleşme Anahtarı': match_key,
+                        })
+                    elif len(found_matches) > 1:
+                        signature = f"{seri_val}|{','.join(found_matches)}"
+                        if signature not in logged_ambiguities:
+                            preview = ', '.join(found_matches[:3])
+                            if len(found_matches) > 3:
+                                preview += ', …'
+                            self._log(f"⚠️ {seri_val} için {len(found_matches)} olası XML bulundu: {preview}")
+                            logged_ambiguities.add(signature)
+                        unmatched_records.append({
+                            'Seri': seri_val,
+                            'Excel Dosyası': os.path.basename(excel_path),
+                            'İşlem Noktası': row.get(nokta_col) if nokta_col else None,
+                            'Not': f'{len(found_matches)} olası eşleşme bulundu',
                         })
                     else:
                         unmatched_records.append({
                             'Seri': seri_val,
                             'Excel Dosyası': os.path.basename(excel_path),
                             'İşlem Noktası': row.get(nokta_col) if nokta_col else None,
+                            'Not': 'XML eşleşmesi bulunamadı',
                         })
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -4262,6 +4354,7 @@ class MainApp(tk.Tk):
         except Exception:
             self.geometry("1280x860")
         self.minsize(1024, 700)
+        self.resizable(True, True)
         
         # Immersive hero header
         hero = ttk.Frame(self, style='Hero.TFrame', padding=(PADDING['large'], PADDING['medium']))
