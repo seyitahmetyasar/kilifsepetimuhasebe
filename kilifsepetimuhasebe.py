@@ -33,7 +33,7 @@ import ctypes
 import traceback
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional, Sequence
+from typing import Dict, List, Tuple, Optional, Sequence, Set
 import xml.etree.ElementTree as ET
 
 # ======= 3rd Party =======
@@ -2015,20 +2015,55 @@ def _normalize_identifier(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", normalize_text(value))
 
 
+SERIAL_KEYWORDS = (
+    "seri", "serial", "s/no", "s\\/no", "imei", "imeı", "sn", "serino", "seri no",
+)
+
+
+def _extract_serial_candidates(text: Optional[str]) -> Set[str]:
+    if not text:
+        return set()
+    cleaned = normalize_text(text)
+    if not cleaned:
+        return set()
+
+    # İlk olarak anahtar kelimelerden sonra gelen dizileri yakala
+    results: Set[str] = set()
+    lowered = cleaned.casefold()
+    for keyword in SERIAL_KEYWORDS:
+        if keyword in lowered:
+            pattern = re.compile(rf"{re.escape(keyword)}\s*[:#\-]*\s*([A-Z0-9]+)", re.IGNORECASE)
+            for match in pattern.findall(text):
+                candidate = _normalize_identifier(match)
+                if len(candidate) >= 6:
+                    results.add(candidate)
+
+    # IMEI benzeri uzun sayı dizilerini de ayıkla
+    for match in re.findall(r"[A-Z0-9]{10,}", cleaned):
+        candidate = _normalize_identifier(match)
+        if len(candidate) >= 10:
+            results.add(candidate)
+
+    return results
+
+
 def parse_xml_invoice_metadata(xml_path: Path) -> Tuple[set, Dict[str, Optional[object]]]:
     identifiers: set = set()
-    meta: Dict[str, Optional[str]] = {
+    meta: Dict[str, Optional[object]] = {
         "date": None,
         "customer": None,
         "supplier": None,
         "amount": None,
         "currency": None,
+        "serials": [],
     }
     try:
         tree = ET.parse(str(xml_path))
         root = tree.getroot()
     except Exception:
         return identifiers, meta
+
+    serial_candidates: Set[str] = set()
 
     # ID ve UUID alanlarını yakala
     id_tags = [".//{*}ID", ".//{*}UUID", ".//{*}InvoiceID", ".//{*}ProfileID"]
@@ -2038,6 +2073,30 @@ def parse_xml_invoice_metadata(xml_path: Path) -> Tuple[set, Dict[str, Optional[
                 identifiers.add(elem.text.strip())
 
     identifiers.add(xml_path.stem)
+
+    # Seri bilgisi içerebilecek alanları tara
+    for elem in root.findall('.//{*}SerialID'):
+        if elem is not None and elem.text:
+            serial_candidates.add(_normalize_identifier(elem.text))
+
+    for prop in root.findall('.//{*}AdditionalItemProperty'):
+        name_elem = prop.find('.//{*}Name')
+        value_elem = prop.find('.//{*}Value')
+        if name_elem is not None and value_elem is not None and name_elem.text:
+            if 'seri' in name_elem.text.casefold() or 'imei' in name_elem.text.casefold():
+                serial_candidates.add(_normalize_identifier(value_elem.text or ''))
+                serial_candidates.update(_extract_serial_candidates(value_elem.text))
+
+    for note_elem in root.findall('.//{*}Note'):
+        serial_candidates.update(_extract_serial_candidates(note_elem.text))
+
+    for desc_elem in root.findall('.//{*}Description'):
+        serial_candidates.update(_extract_serial_candidates(desc_elem.text))
+
+    serial_candidates = {s for s in serial_candidates if s}
+    if serial_candidates:
+        identifiers.update(serial_candidates)
+        meta["serials"] = sorted(serial_candidates)
 
     issue_date = root.find('.//{*}IssueDate')
     if issue_date is not None and issue_date.text:
@@ -2065,17 +2124,26 @@ def parse_xml_invoice_metadata(xml_path: Path) -> Tuple[set, Dict[str, Optional[
 
 
 def build_xml_index(xml_folder: Path) -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Optional[object]]]]:
-    index: Dict[str, set] = {}
-    meta: Dict[str, Dict[str, Optional[str]]] = {}
-    for xml_path in Path(xml_folder).glob('*.xml'):
+    index: Dict[str, Set[str]] = {}
+    meta: Dict[str, Dict[str, Optional[object]]] = {}
+    base = Path(xml_folder)
+    if not base.exists():
+        return {}, {}
+
+    for xml_path in sorted(base.rglob('*.xml')):
         ids, info = parse_xml_invoice_metadata(xml_path)
-        info['file'] = xml_path.name
-        meta[xml_path.name] = info
+        try:
+            rel_name = str(xml_path.relative_to(base))
+        except ValueError:
+            rel_name = xml_path.name
+        info['file'] = rel_name
+        meta[rel_name] = info
         for ident in ids:
             norm = _normalize_identifier(ident)
             if not norm:
                 continue
-            index.setdefault(norm, set()).add(xml_path.name)
+            index.setdefault(norm, set()).add(rel_name)
+
     normalized_index: Dict[str, List[str]] = {k: sorted(v) for k, v in index.items()}
     return normalized_index, meta
 
@@ -2426,7 +2494,7 @@ class PDFMatcherTab(ttk.Frame):
 
 class XMLMatcherTab(ttk.Frame):
     def __init__(self, parent, apis, headers, invoice_tab_ref: InvoiceTab):
-        super().__init__(parent, padding=10)
+        super().__init__(parent, padding=PADDING['large'])
         self.apis = apis
         self.headers = headers
         self.invoice_tab_ref = invoice_tab_ref
@@ -2441,23 +2509,58 @@ class XMLMatcherTab(ttk.Frame):
         self.excel_files_var = tk.StringVar(value=self.settings.get('last_xml_excel', ''))
         self.amount_tolerance = tk.StringVar(value=self.settings.get('xml_amount_tolerance', '1.0'))
 
-        root_cols = 12
-        for c in range(root_cols):
-            self.columnconfigure(c, weight=1)
+        self.columnconfigure(0, weight=1)
 
-        ttk.Label(self, text='XML Eşleştirici', style='LargeTitle.TLabel').grid(
-            row=0, column=0, columnspan=root_cols, sticky='w')
+        hero = ttk.Frame(self, style='Hero.TFrame', padding=PADDING['xlarge'])
+        hero.grid(row=0, column=0, sticky='ew')
+        hero.columnconfigure(0, weight=1)
+        ttk.Label(hero, text='🧾 XML Eşleştirici', style='HeroTitle.TLabel').grid(row=0, column=0, sticky='w')
         ttk.Label(
-            self,
-            text='UBL XML faturalarını Excel listelerindeki seri numaraları ve tutarlarla eşleştirin.',
-            style='Card.TLabel',
-            foreground=COLORS['text_muted']
-        ).grid(row=1, column=0, columnspan=root_cols, sticky='w', pady=(0, PADDING['small']))
+            hero,
+            text='UBL XML faturalarını Excel listeleriyle saniyeler içinde eşleştirin, tutar farklarını görün ve rapor alın.',
+            style='HeroSub.TLabel'
+        ).grid(row=1, column=0, sticky='w', pady=(PADDING['xs'], 0))
 
-        ttk.Label(self, text='API Hesabı (XML indir için):').grid(row=2, column=0, sticky='w')
+        badge_bar = ttk.Frame(hero, style='Hero.TFrame')
+        badge_bar.grid(row=2, column=0, sticky='w', pady=(PADDING['small'], 0))
+        ttk.Label(badge_bar, text='Canlı Log', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_bar, text='Seri No analizi', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_bar, text='Excel karşılaştırma', style='HeroBadge.TLabel').pack(side='left')
+
+        content = ttk.Frame(self, style='Surface.TFrame', padding=PADDING['medium'])
+        content.grid(row=1, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        content.columnconfigure(0, weight=1)
+        content.columnconfigure(1, weight=1)
+
+        sources_card = ttk.LabelFrame(content, text='Veri Kaynakları', style='TLabelframe', padding=PADDING['medium'])
+        sources_card.grid(row=0, column=0, sticky='nsew', padx=(0, PADDING['medium']))
+        sources_card.columnconfigure(0, weight=1)
+
+        ttk.Label(sources_card, text='XML klasörünü seçin veya otomatik indirin.', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).pack(anchor='w')
+
+        xml_row = ttk.Frame(sources_card, style='Card.TFrame')
+        xml_row.pack(fill='x', pady=(PADDING['small'], 0))
+        ttk.Entry(xml_row, textvariable=self.xml_folder_var).pack(side='left', fill='x', expand=True)
+        ttk.Button(xml_row, text='📂 Klasör Seç', command=self._browse_xml_folder).pack(side='left', padx=(PADDING['small'], 0))
+
+        excel_row = ttk.Frame(sources_card, style='Card.TFrame')
+        excel_row.pack(fill='x', pady=(PADDING['small'], 0))
+        ttk.Entry(excel_row, textvariable=self.excel_files_var).pack(side='left', fill='x', expand=True)
+        ttk.Button(excel_row, text='📄 Dosya Seç', command=self._browse_excel_files).pack(side='left', padx=(PADDING['small'], 0))
+
+        ttk.Label(sources_card, text='Birden fazla Excel seçimi için ; ile ayrılmış yol listesi kullanılır.',
+                  style='Card.TLabel', foreground=COLORS['text_muted']).pack(anchor='w', pady=(PADDING['small'], 0))
+
+        download_card = ttk.LabelFrame(content, text='e-Fatura Gelen XML İndir', style='TLabelframe', padding=PADDING['medium'])
+        download_card.grid(row=0, column=1, sticky='nsew')
+        download_card.columnconfigure(1, weight=1)
+
+        ttk.Label(download_card, text='API Hesabı:', style='Card.TLabel').grid(row=0, column=0, sticky='w')
         self.api_var = tk.StringVar()
-        self.api_cb = ttk.Combobox(self, values=list(apis.keys()), textvariable=self.api_var, state='readonly')
-        self.api_cb.grid(row=2, column=1, sticky='ew')
+        self.api_cb = ttk.Combobox(download_card, values=list(apis.keys()), textvariable=self.api_var, state='readonly')
+        self.api_cb.grid(row=0, column=1, sticky='ew', padx=(PADDING['small'], 0))
+
         if apis:
             last_api = self.settings.get('last_xml_api') or self.settings.get('last_api', '')
             if last_api in apis:
@@ -2471,67 +2574,62 @@ class XMLMatcherTab(ttk.Frame):
         self.api_cb.bind('<<ComboboxSelected>>', self._on_api_change)
 
         now = datetime.now()
-        ttk.Label(self, text='Yıl:').grid(row=2, column=2, sticky='e')
+        ttk.Label(download_card, text='Yıl:', style='Card.TLabel').grid(row=1, column=0, sticky='w', pady=(PADDING['small'], 0))
         years = [str(now.year + i) for i in range(-10, 15)]
-        self.year = ttk.Combobox(self, values=years, width=6, state='readonly')
+        self.year = ttk.Combobox(download_card, values=years, width=6, state='readonly')
         self.year.set(str(now.year))
-        self.year.grid(row=2, column=3, sticky='w')
+        self.year.grid(row=1, column=1, sticky='w', padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
         self.year.configure(background=COLORS['card'], foreground=COLORS['text'])
 
-        ttk.Label(self, text='Ay:').grid(row=2, column=4, sticky='e')
-        self.month = ttk.Combobox(self, values=[f"{i:02d}" for i in range(1, 13)], width=4, state='readonly')
+        ttk.Label(download_card, text='Ay:', style='Card.TLabel').grid(row=2, column=0, sticky='w')
+        self.month = ttk.Combobox(download_card, values=[f"{i:02d}" for i in range(1, 13)], width=4, state='readonly')
         self.month.set(f"{now.month:02d}")
-        self.month.grid(row=2, column=5, sticky='w')
+        self.month.grid(row=2, column=1, sticky='w', padx=(PADDING['small'], 0))
         self.month.configure(background=COLORS['card'], foreground=COLORS['text'])
 
         self.btn_fetch_incoming = ttk.Button(
-            self,
+            download_card,
             text="📥 e-Fatura Gelen'den XML indir",
             style='Accent.TButton',
             command=self._fetch_incoming_xmls
         )
-        self.btn_fetch_incoming.grid(row=2, column=6, sticky='w', padx=6)
+        self.btn_fetch_incoming.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(PADDING['medium'], 0))
 
-        ttk.Label(self, text='XML Klasörü:').grid(row=3, column=0, sticky='w', pady=(PADDING['small'], 0))
-        ttk.Entry(self, textvariable=self.xml_folder_var).grid(
-            row=3, column=1, columnspan=5, sticky='ew', padx=6, pady=(PADDING['small'], 0))
-        ttk.Button(self, text='📂 Klasör Seç', command=self._browse_xml_folder).grid(
-            row=3, column=6, sticky='w', pady=(PADDING['small'], 0))
-
-        ttk.Label(self, text='Excel Dosyaları:').grid(row=4, column=0, sticky='w')
-        ttk.Entry(self, textvariable=self.excel_files_var).grid(
-            row=4, column=1, columnspan=5, sticky='ew', padx=6)
-        ttk.Button(self, text='📄 Dosya Seç', command=self._browse_excel_files).grid(row=4, column=6, sticky='w')
-
-        options = ttk.Frame(self, style='Card.TFrame')
-        options.grid(row=5, column=0, columnspan=root_cols, sticky='ew', pady=(PADDING['small'], 0))
-        ttk.Label(options, text='Tutar toleransı (TL):', style='Card.TLabel').grid(
-            row=0, column=0, sticky='w', padx=(PADDING['medium'], PADDING['xs']), pady=(PADDING['xs'], PADDING['xs']))
-        ttk.Entry(options, textvariable=self.amount_tolerance, width=10).grid(
-            row=0, column=1, sticky='w', pady=(PADDING['xs'], PADDING['xs']))
-        ttk.Label(options, text='Boş bırakılırsa tutar karşılaştırması yapılmaz.', style='Card.TLabel',
+        options_card = ttk.LabelFrame(self, text='Eşleştirme Ayarları', style='TLabelframe', padding=PADDING['medium'])
+        options_card.grid(row=2, column=0, sticky='ew', pady=(PADDING['medium'], 0))
+        options_card.columnconfigure(1, weight=1)
+        ttk.Label(options_card, text='Tutar toleransı (TL):', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Entry(options_card, textvariable=self.amount_tolerance, width=12).grid(
+            row=0, column=1, sticky='w', padx=(PADDING['small'], PADDING['small']))
+        ttk.Label(options_card, text='Boş bırakılırsa tutar karşılaştırması yapılmaz.', style='Card.TLabel',
                   foreground=COLORS['text_muted']).grid(row=0, column=2, sticky='w')
 
-        btn_row = ttk.Frame(self, style='Card.TFrame')
-        btn_row.grid(row=6, column=0, columnspan=root_cols, sticky='ew', pady=PADDING['medium'])
-        self.btn_start = ttk.Button(btn_row, text='🚀 Başlat', style='Accent.TButton', command=self._start_process)
-        self.btn_start.pack(side='left', padx=5)
-        self.btn_stop = ttk.Button(btn_row, text='⏹ Durdur', style='Warning.TButton',
+        actions_card = ttk.Frame(self, style='Card.TFrame', padding=PADDING['medium'])
+        actions_card.grid(row=3, column=0, sticky='ew', pady=(PADDING['medium'], 0))
+        actions_card.columnconfigure(0, weight=1)
+
+        buttons_left = ttk.Frame(actions_card, style='Card.TFrame')
+        buttons_left.grid(row=0, column=0, sticky='w')
+        self.btn_start = ttk.Button(buttons_left, text='🚀 Başlat', style='Accent.TButton', command=self._start_process)
+        self.btn_start.pack(side='left', padx=(0, PADDING['small']))
+        self.btn_stop = ttk.Button(buttons_left, text='⏹ Durdur', style='Warning.TButton',
                                    command=self._stop_process, state='disabled')
-        self.btn_stop.pack(side='left', padx=5)
-        self.btn_restart = ttk.Button(btn_row, text='🔄 Yeniden', style='Secondary.TButton',
+        self.btn_stop.pack(side='left', padx=(0, PADDING['small']))
+        self.btn_restart = ttk.Button(buttons_left, text='🔄 Yeniden', style='Secondary.TButton',
                                       command=self._restart_process, state='disabled')
-        self.btn_restart.pack(side='left', padx=5)
-        ttk.Button(btn_row, text='📁 Klasöre Git', command=self._open_output_folder).pack(side='right', padx=5)
+        self.btn_restart.pack(side='left')
 
-        log_frame = ttk.Frame(self, style='Card.TFrame')
-        log_frame.grid(row=7, column=0, columnspan=root_cols, sticky='nsew', pady=(0, PADDING['medium']))
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(1, weight=1)
+        ttk.Button(actions_card, text='📁 Çıktı Klasörünü Aç', command=self._open_output_folder).grid(
+            row=0, column=1, sticky='e')
 
-        ttk.Label(log_frame, text='Log Kayıtları', style='Title.TLabel').grid(
-            row=0, column=0, sticky='w', padx=12, pady=(12, 0))
-        self.log = scrolledtext.ScrolledText(log_frame, height=18, wrap='word')
+        log_card = ttk.Frame(self, style='Card.TFrame', padding=PADDING['medium'])
+        log_card.grid(row=4, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        log_card.columnconfigure(0, weight=1)
+        log_card.rowconfigure(1, weight=1)
+
+        ttk.Label(log_card, text='Canlı Log', style='Title.TLabel').grid(
+            row=0, column=0, sticky='w', padx=12, pady=(0, PADDING['xs']))
+        self.log = scrolledtext.ScrolledText(log_card, height=20, wrap='word')
         self.log.grid(row=1, column=0, sticky='nsew', padx=12, pady=12)
         style_scrolled_text(self.log)
         try:
@@ -2541,7 +2639,7 @@ class XMLMatcherTab(ttk.Frame):
         except Exception:
             pass
 
-        self.rowconfigure(7, weight=1)
+        self.rowconfigure(4, weight=1)
 
     def _on_api_change(self, _=None):
         api_name = self.api_cb.get()
@@ -2694,6 +2792,11 @@ class XMLMatcherTab(ttk.Frame):
         except Exception:
             tolerance = None
             self._log('⚠️ Tolerans değeri okunamadı, tutar karşılaştırması yapılmayacak.')
+        else:
+            if tolerance is None:
+                self._log('ℹ️ Tutar karşılaştırması devre dışı bırakıldı.')
+            else:
+                self._log(f'ℹ️ Tutar toleransı: ±{tolerance:.2f} TL')
 
         matched_records: List[Dict[str, object]] = []
         unmatched_records: List[Dict[str, object]] = []
@@ -2766,6 +2869,7 @@ class XMLMatcherTab(ttk.Frame):
                         'XML Tarih': info.get('date'),
                         'Müşteri': info.get('customer'),
                         'Tedarikçi': info.get('supplier'),
+                        'XML Seri Bilgileri': ', '.join(info.get('serials', [])) or None,
                     })
                 else:
                     unmatched_records.append({
@@ -2788,7 +2892,10 @@ class XMLMatcherTab(ttk.Frame):
 
         unused_xml = set(xml_meta.keys()) - matched_xml_files
         if unused_xml:
-            self._log(f'ℹ️ Excel listelerinde bulunmayan {len(unused_xml)} XML faturası var.')
+            preview = ', '.join(sorted(unused_xml)[:5])
+            if len(unused_xml) > 5:
+                preview += ', …'
+            self._log(f'ℹ️ Excel listelerinde bulunmayan {len(unused_xml)} XML faturası var. Örnek: {preview}')
 
         duration = time.time() - start
         match_ratio = (len(matched_records) / total_rows * 100.0) if total_rows else 0.0
@@ -3099,9 +3206,20 @@ def export_to_excel(summary_df: pd.DataFrame, detail_df: pd.DataFrame, raw_df: p
 
 # ---------- Ayar ----------
 def inv_load_config() -> dict:
+    settings = load_settings()
+    cfg = settings.get("inventory_config")
+    if isinstance(cfg, dict):
+        return cfg
     if INV_APP_CONFIG.exists():
         try:
-            return json.loads(INV_APP_CONFIG.read_text(encoding="utf-8"))
+            data = json.loads(INV_APP_CONFIG.read_text(encoding="utf-8"))
+            settings["inventory_config"] = data
+            save_settings(settings)
+            try:
+                INV_APP_CONFIG.unlink()
+            except Exception:
+                pass
+            return data if isinstance(data, dict) else {}
         except Exception:
             return {}
     return {}
@@ -3109,7 +3227,18 @@ def inv_load_config() -> dict:
 
 def inv_save_config(cfg: dict) -> bool:
     try:
-        INV_APP_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        settings = load_settings()
+    except Exception:
+        settings = APP_SETTINGS.copy()
+    settings["inventory_config"] = cfg
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+        if INV_APP_CONFIG.exists():
+            try:
+                INV_APP_CONFIG.unlink()
+            except Exception:
+                pass
         return True
     except Exception:
         return False
