@@ -341,10 +341,12 @@ def apply_modern_theme(root, existing_style=None):
         padding=(18, 10),
         relief='flat',
         borderwidth=0,
-        font=button_font,
+        font=button_font)
+    style.configure(
+        'TButton',
+        **base_button_conf,
         background=COLORS['card'],
         foreground=COLORS['text'])
-    style.configure('TButton', **base_button_conf)
     style.map('TButton',
         background=[('active', COLORS['card_hover']), ('pressed', COLORS['card_hover'])])
 
