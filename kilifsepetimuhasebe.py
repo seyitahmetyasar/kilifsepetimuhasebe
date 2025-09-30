@@ -3013,9 +3013,20 @@ class InventoryTab(ttk.Frame):
             # Bucket filtreleri uygulanır
             include = {b for b,v in self.bucket_includes.items() if v.get()}
             if include:
-                summary = summary[summary["KATEGORİ"].isin(list(include)) + [True] ]  # toplam satır True
-                detail = detail[detail["_bucket"].isin(include)]
-                raw    = raw[raw["Bucket"].isin(include)]
+                summary_mask = summary["KATEGORİ"].isin(include) | (summary["KATEGORİ"] == "TÜM ADET / CİRO")
+                detail_mask = detail["_bucket"].isin(include)
+                raw_mask = raw["Bucket"].isin(include)
+
+                if len(summary_mask) != len(summary):
+                    raise ValueError("Summary mask length mismatch")
+                if len(detail_mask) != len(detail):
+                    raise ValueError("Detail mask length mismatch")
+                if len(raw_mask) != len(raw):
+                    raise ValueError("Raw mask length mismatch")
+
+                summary = summary[summary_mask]
+                detail = detail[detail_mask]
+                raw = raw[raw_mask]
 
             self.summary_df = summary
             self.detail_df  = detail.rename(columns={"_bucket":"Bucket","_kategori":"Kategori","ADET":"Adet","ALIS_CIRO":"Alış Ciro"})
