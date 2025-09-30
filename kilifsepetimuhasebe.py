@@ -239,6 +239,14 @@ def apply_modern_theme(root, existing_style=None):
         background=COLORS['card'],
         foreground=COLORS['text'],
         font=base_font)
+    style.configure('TopbarTitle.TLabel',
+        background=COLORS['surface'],
+        foreground=COLORS['primary'],
+        font=large_title_font)
+    style.configure('TopbarSub.TLabel',
+        background=COLORS['surface'],
+        foreground=COLORS['text_muted'],
+        font=medium_font)
     style.configure('Title.TLabel',
         background=COLORS['card'],
         foreground=COLORS['accent'],
@@ -4186,12 +4194,15 @@ class MainApp(tk.Tk):
                         break
             except Exception:
                 pass
-        
-        ttk.Label(branding, text='NES Toolkit', style='HeroTitle.TLabel').pack(anchor='w')
+
+        topbar_labels = ttk.Frame(branding, style='Surface.TFrame')
+        topbar_labels.pack(anchor='w', fill='x')
+
+        ttk.Label(topbar_labels, text='NES Toolkit', style='TopbarTitle.TLabel').pack(anchor='w')
         ttk.Label(
-            branding,
+            topbar_labels,
             text='Dijital fatura, PDF/XML eşleştirme ve envanter raporları tek panelde.',
-            style='HeroSub.TLabel'
+            style='TopbarSub.TLabel'
         ).pack(anchor='w', pady=(4, 0))
         
         badge_row = ttk.Frame(branding, style='Hero.TFrame')
