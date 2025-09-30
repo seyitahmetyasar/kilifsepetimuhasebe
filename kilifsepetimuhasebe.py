@@ -66,14 +66,6 @@ try:
 except Exception:
     HAS_CALENDAR = False
 
-try:
-    from PIL import Image, ImageTk  # noqa
-    import base64  # noqa
-    HAS_PIL = True
-except Exception:
-    HAS_PIL = False
-
-
 # ===========================================================================
 # UI Teması & Genel Ayarlar (YENİ)
 # ===========================================================================
@@ -2600,30 +2592,10 @@ class XMLMatcherTab(ttk.Frame):
         self.amount_tolerance = tk.StringVar(value=self.settings.get('xml_amount_tolerance', '1.0'))
 
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
-
-        header = ttk.Frame(self, style='Surface.TFrame', padding=(PADDING['xlarge'], PADDING['large']))
-        header.grid(row=0, column=0, sticky='ew')
-        header.columnconfigure(0, weight=1)
-        ttk.Label(header, text='🧾 XML Eşleştirici', style='LargeTitle.TLabel').grid(row=0, column=0, sticky='w')
-        ttk.Label(
-            header,
-            text='UBL XML faturalarını Excel listeleriyle saniyeler içinde eşleştirin, canlı log ile süreci takip edin.',
-            style='Card.TLabel',
-            foreground=COLORS['text_muted']
-        ).grid(row=1, column=0, sticky='w', pady=(PADDING['xs'], 0))
-
-        quick_actions = ttk.Frame(header, style='Surface.TFrame')
-        quick_actions.grid(row=0, column=1, rowspan=2, sticky='e')
-        ttk.Label(quick_actions, text='⚡ Gerçek zamanlı analiz', style='Card.TLabel',
-                  foreground=COLORS['text_muted']).pack(anchor='e')
-        ttk.Label(quick_actions, text='🗂 Yeniden boyutlanabilir paneller', style='Card.TLabel',
-                  foreground=COLORS['text_muted']).pack(anchor='e')
-
-        ttk.Separator(self, orient='horizontal').grid(row=1, column=0, sticky='ew')
+        self.rowconfigure(0, weight=1)
 
         paned = ttk.Panedwindow(self, orient='vertical')
-        paned.grid(row=2, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        paned.grid(row=0, column=0, sticky='nsew')
         try:
             paned.configure(sashrelief='flat', sashwidth=14)
         except tk.TclError:
@@ -4356,44 +4328,21 @@ class MainApp(tk.Tk):
         self.minsize(1024, 700)
         self.resizable(True, True)
         
-        # Immersive hero header
-        hero = ttk.Frame(self, style='Hero.TFrame', padding=(PADDING['large'], PADDING['medium']))
-        hero.pack(fill='x', padx=PADDING['large'], pady=(PADDING['medium'], PADDING['small']))
-        hero.columnconfigure(0, weight=1)
-        hero.columnconfigure(1, weight=0)
-        
-        branding = ttk.Frame(hero, style='Hero.TFrame')
-        branding.grid(row=0, column=0, sticky='w')
-        
-        if HAS_PIL:
-            try:
-                from PIL import Image, ImageTk
-                logo_candidates = ['saylogo3.png', 'sayapp.png']
-                for logo_file in logo_candidates:
-                    logo_path = Path(__file__).with_name(logo_file)
-                    if logo_path.exists():
-                        _img = Image.open(str(logo_path)).resize((140, 42), Image.LANCZOS)
-                        self._logo_img = ImageTk.PhotoImage(_img)
-                        ttk.Label(branding, image=self._logo_img, style='HeroImage.TLabel').pack(anchor='w', pady=(0, PADDING['small']))
-                        break
-            except Exception:
-                pass
-        
-        ttk.Label(branding, text='NES Toolkit', style='HeroTitle.TLabel').pack(anchor='w')
+        # Minimal üst çubuk
+        topbar = ttk.Frame(self, style='Surface.TFrame', padding=(PADDING['medium'], PADDING['small']))
+        topbar.pack(fill='x', padx=PADDING['large'], pady=(PADDING['medium'], 0))
+        topbar.columnconfigure(0, weight=1)
+
+        ttk.Label(topbar, text='NES Toolkit', style='LargeTitle.TLabel').grid(row=0, column=0, sticky='w')
         ttk.Label(
-            branding,
-            text='Dijital fatura, PDF/XML eşleştirme ve envanter raporları tek panelde.',
-            style='HeroSub.TLabel'
-        ).pack(anchor='w', pady=(4, 0))
-        
-        badge_row = ttk.Frame(branding, style='Hero.TFrame')
-        badge_row.pack(anchor='w', pady=(PADDING['small'], 0))
-        ttk.Label(badge_row, text='⚡ Otomatik Ayar Kaydı', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
-        ttk.Label(badge_row, text='🌓 Modern Koyu Tema', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
-        ttk.Label(badge_row, text='🧾 PDF/XML Uyumlu', style='HeroBadge.TLabel').pack(side='left')
-        
-        controls = ttk.Frame(hero, style='Hero.TFrame')
-        controls.grid(row=0, column=1, sticky='ne', padx=(PADDING['large'], 0))
+            topbar,
+            text='Dijital fatura, PDF/XML eşleştirme ve envanter araçları',
+            style='Card.TLabel',
+            foreground=COLORS['text_muted']
+        ).grid(row=1, column=0, sticky='w', pady=(PADDING['xs'], 0))
+
+        controls = ttk.Frame(topbar, style='Surface.TFrame')
+        controls.grid(row=0, column=1, rowspan=2, sticky='e', padx=(PADDING['large'], 0))
         
         self._dark_var = tk.BooleanVar(value=(self.settings.get('theme', 'dark') == 'dark'))
         
