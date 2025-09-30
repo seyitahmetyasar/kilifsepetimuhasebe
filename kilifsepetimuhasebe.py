@@ -33,7 +33,8 @@ import ctypes
 import traceback
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Sequence, Set
+import xml.etree.ElementTree as ET
 
 # ======= 3rd Party =======
 try:
@@ -78,50 +79,62 @@ except Exception:
 # ===========================================================================
 
 # Modern Brand Colors
-BRAND_GREEN = '#00D4AA'   # Modern teal-green
-BRAND_BLUE = '#0066FF'    # Vibrant blue
-BRAND_PURPLE = '#8B5CF6'  # Modern purple
+BRAND_AQUA   = '#14B8A6'  # fresh aqua accent
+BRAND_INDIGO = '#6366F1'  # soft indigo highlight
+BRAND_CYAN   = '#22D3EE'  # highlight for interactions
 
 LIGHT_COLORS = {
-    'primary'   : '#1A1A1A',
-    'secondary' : BRAND_BLUE,
-    'accent'    : BRAND_GREEN,
-    'accent_hover': '#00B894',
-    'warning'   : '#FF6B6B',
-    'success'   : '#51CF66',
-    'background': '#F8FAFC',
-    'card'      : '#FFFFFF',
-    'card_hover': '#F1F5F9',
-    'text'      : '#1A1A1A',
-    'text_light': '#64748B',
-    'text_muted': '#94A3B8',
-    'border'    : '#E2E8F0',
-    'border_light': '#F1F5F9',
-    'hover'     : '#F8FAFC',
-    'shadow'    : 'rgba(0, 0, 0, 0.1)',
+    'primary'      : '#0F172A',
+    'secondary'    : BRAND_INDIGO,
+    'accent'       : BRAND_AQUA,
+    'accent_hover' : '#0FA59B',
+    'warning'      : '#F97316',
+    'success'      : '#10B981',
+    'background'   : '#F8FAFC',
+    'surface'      : '#F1F5F9',
+    'card'         : '#FFFFFF',
+    'card_hover'   : '#E2E8F0',
+    'text'         : '#0F172A',
+    'text_light'   : '#475569',
+    'text_muted'   : '#94A3B8',
+    'border'       : '#CBD5F5',
+    'border_light' : '#E2E8F0',
+    'hover'        : '#E2E8F0',
+    'shadow'       : 'rgba(15, 23, 42, 0.08)',
+    'hero_bg'      : '#E0F2F1',
+    'hero_fg'      : '#0F172A',
+    'hero_subtle'  : '#4B5563',
+    'glass'        : '#FFFFFFCC',
+    'glass_border' : '#E2E8F0',
     'gradient_start': '#FFFFFF',
-    'gradient_end': '#F8FAFC'
+    'gradient_end' : '#F8FAFC'
 }
 
 DARK_COLORS = {
-    'primary'   : '#F1F5F9',
-    'secondary' : '#3B82F6',
-    'accent'    : BRAND_GREEN,
-    'accent_hover': '#00B894',
-    'warning'   : '#F87171',
-    'success'   : '#34D399',
-    'background': '#0F172A',
-    'card'      : '#1E293B',
-    'card_hover': '#334155',
-    'text'      : '#F1F5F9',
-    'text_light': '#CBD5E1',
-    'text_muted': '#94A3B8',
-    'border'    : '#334155',
-    'border_light': '#475569',
-    'hover'     : '#1E293B',
-    'shadow'    : 'rgba(0, 0, 0, 0.3)',
-    'gradient_start': '#1E293B',
-    'gradient_end': '#0F172A'
+    'primary'      : '#F8FAFC',
+    'secondary'    : BRAND_CYAN,
+    'accent'       : BRAND_AQUA,
+    'accent_hover' : '#0FA59B',
+    'warning'      : '#FB7185',
+    'success'      : '#34D399',
+    'background'   : '#050B1A',
+    'surface'      : '#0B162C',
+    'card'         : '#101F3A',
+    'card_hover'   : '#152748',
+    'text'         : '#E2E8F0',
+    'text_light'   : '#94A3B8',
+    'text_muted'   : '#64748B',
+    'border'       : '#1E335C',
+    'border_light' : '#233A6B',
+    'hover'        : '#162B4F',
+    'shadow'       : 'rgba(8, 15, 35, 0.35)',
+    'hero_bg'      : '#12274B',
+    'hero_fg'      : '#ECFEFF',
+    'hero_subtle'  : '#7DD3FC',
+    'glass'        : '#0F1F3ACC',
+    'glass_border' : '#1E335C',
+    'gradient_start': '#162B4F',
+    'gradient_end' : '#050B1A'
 }
 
 COLORS = LIGHT_COLORS.copy()
@@ -160,282 +173,222 @@ def apply_modern_theme(root, existing_style=None):
     except Exception:
         pass
 
-    # Modern typography with better readability
-    base_font = ('Segoe UI', 11)  # Increased base size for better readability
-    medium_font = ('Segoe UI', 12)
-    title_font = ('Segoe UI', 13, 'bold')
-    large_title_font = ('Segoe UI', 15, 'bold')
-    button_font = ('Segoe UI', 11, 'bold')  # Bold for buttons
+    accent_text_color = '#04111B' if COLORS['background'] == LIGHT_COLORS['background'] else '#ECFEFF'
 
-    # Modern Frames with subtle gradients
+    # Modern typography with better readability
+    base_font = ('Segoe UI Variable Text', 11)
+    medium_font = ('Segoe UI Variable Text', 12)
+    title_font = ('Segoe UI Variable Display', 13, 'bold')
+    large_title_font = ('Segoe UI Variable Display', 16, 'bold')
+    hero_title_font = ('Segoe UI Variable Display', 20, 'bold')
+    hero_subtitle_font = ('Segoe UI Variable Text', 11)
+    button_font = ('Segoe UI', 11, 'bold')
+
+    # Layered frames & containers
     style.configure('TFrame', background=COLORS['background'], relief='flat', borderwidth=0)
-    style.configure('Card.TFrame', 
-        background=COLORS['card'], 
-        relief='flat', 
+    style.configure('Surface.TFrame', background=COLORS['surface'], relief='flat', borderwidth=0)
+    style.configure('Card.TFrame',
+        background=COLORS['card'],
+        relief='flat',
         borderwidth=1,
         bordercolor=COLORS['border'])
-    style.configure('Elevated.TFrame', 
-        background=COLORS['card'], 
-        relief='solid', 
+    style.configure('Glass.TFrame',
+        background=COLORS['glass'],
+        relief='solid',
+        borderwidth=1,
+        bordercolor=COLORS['glass_border'])
+    style.configure('Elevated.TFrame',
+        background=COLORS['card'],
+        relief='solid',
         borderwidth=1,
         bordercolor=COLORS['border_light'])
-    
-    # Modern LabelFrames with subtle gradients
-    style.configure('TLabelframe', 
-        background=COLORS['card'], 
+    style.configure('Hero.TFrame',
+        background=COLORS['hero_bg'],
+        relief='flat',
+        borderwidth=0)
+    style.configure('HeroImage.TLabel',
+        background=COLORS['hero_bg'])
+    style.configure('HeroBadge.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['accent'],
+        font=('Segoe UI', 10, 'bold'),
+        padding=(12, 4))
+
+    # Modern LabelFrames with soft glow
+    style.configure('TLabelframe',
+        background=COLORS['card'],
         bordercolor=COLORS['border'],
         borderwidth=1,
         relief='solid')
-    style.configure('TLabelframe.Label', 
-        background=COLORS['card'], 
-        foreground=COLORS['accent'], 
-        font=('Segoe UI', 12, 'bold'),
-        padding=(8, 4))
+    style.configure('TLabelframe.Label',
+        background=COLORS['card'],
+        foreground=COLORS['accent'],
+        font=('Segoe UI', 11, 'bold'),
+        padding=(10, 6))
 
     # Enhanced Labels
-    style.configure('TLabel', 
-        background=COLORS['background'], 
-        foreground=COLORS['text'], 
+    style.configure('TLabel',
+        background=COLORS['background'],
+        foreground=COLORS['text'],
         font=base_font)
-    style.configure('Card.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['text'], 
+    style.configure('Surface.TLabel',
+        background=COLORS['surface'],
+        foreground=COLORS['text'],
         font=base_font)
-    style.configure('Title.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['accent'], 
+    style.configure('Card.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['text'],
+        font=base_font)
+    style.configure('Title.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['accent'],
         font=title_font)
-    style.configure('LargeTitle.TLabel', 
-        background=COLORS['card'], 
-        foreground=COLORS['primary'], 
+    style.configure('LargeTitle.TLabel',
+        background=COLORS['card'],
+        foreground=COLORS['primary'],
         font=large_title_font)
+    style.configure('HeroTitle.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['hero_fg'],
+        font=hero_title_font)
+    style.configure('HeroSub.TLabel',
+        background=COLORS['hero_bg'],
+        foreground=COLORS['hero_subtle'],
+        font=hero_subtitle_font)
 
     # Modern Entry & Combobox with enhanced focus states
     style.configure('TEntry',
-        fieldbackground=COLORS['card'], 
+        fieldbackground=COLORS['card'],
         foreground=COLORS['text'],
-        bordercolor=COLORS['border'], 
-        lightcolor=COLORS['border_light'], 
+        bordercolor=COLORS['border'],
+        lightcolor=COLORS['border_light'],
         darkcolor=COLORS['border'],
-        insertcolor=COLORS['accent'], 
-        relief='solid', 
-        borderwidth=1,
-        padding=14, 
-        font=base_font
-    )
+        padding=(14, 9))
     style.map('TEntry',
-        fieldbackground=[('focus', COLORS['card'])],
-        bordercolor=[('focus', COLORS['accent'])],
-        lightcolor=[('focus', COLORS['accent'])],
-        darkcolor=[('focus', COLORS['accent'])]
-    )
-    
+        fieldbackground=[('focus', COLORS['card_hover'])],
+        bordercolor=[('focus', COLORS['accent'])])
+
     style.configure('TCombobox',
-        fieldbackground=COLORS['card'], 
-        background=COLORS['card'], 
+        fieldbackground=COLORS['card'],
         foreground=COLORS['text'],
-        arrowcolor=COLORS['text_muted'], 
-        bordercolor=COLORS['border'], 
-        relief='solid',
-        borderwidth=1,
-        padding=12, 
-        font=base_font
-    )
+        bordercolor=COLORS['border'],
+        lightcolor=COLORS['border_light'],
+        darkcolor=COLORS['border'],
+        padding=12,
+        font=base_font,
+        relief='flat',
+        borderwidth=1)
     style.map('TCombobox',
         fieldbackground=[
-            ('readonly', COLORS['card']), 
-            ('focus', COLORS['card']),
-            ('hover', COLORS['card_hover'])
+            ('readonly', COLORS['card']),
+            ('focus', COLORS['card'])
         ],
         bordercolor=[
             ('focus', COLORS['accent']),
-            ('hover', COLORS['border'])
+            ('hover', COLORS['border_light'])
         ],
         arrowcolor=[
             ('focus', COLORS['accent']),
             ('hover', COLORS['secondary'])
-        ]
-    )
-    
+        ])
+
     # Modern dropdown styling
     root.option_add('*TCombobox*Listbox.background', COLORS['card'])
     root.option_add('*TCombobox*Listbox.foreground', COLORS['text'])
     root.option_add('*TCombobox*Listbox.selectBackground', COLORS['accent'])
-    root.option_add('*TCombobox*Listbox.selectForeground', '#ffffff')
-    root.option_add('*TCombobox*Listbox.borderWidth', '2')
-    root.option_add('*TCombobox*Listbox.relief', 'solid')
+    root.option_add('*TCombobox*Listbox.selectForeground', '#FFFFFF')
+    root.option_add('*TCombobox*Listbox.borderWidth', '0')
+    root.option_add('*TCombobox*Listbox.relief', 'flat')
 
-    # Modern Notebook / Tabs with subtle elevation
-    style.configure('TNotebook', 
-        background=COLORS['background'], 
-        borderwidth=0, 
-        tabmargins=[4, 6, 4, 0])
+    # Modern Notebook / Tabs with pill look
+    style.configure('TNotebook',
+        background=COLORS['background'],
+        borderwidth=0,
+        tabmargins=[18, 14, 18, 0])
     style.configure('TNotebook.Tab',
-        background=COLORS['border_light'], 
+        background=COLORS['surface'],
         foreground=COLORS['text_muted'],
-        padding=[20, 12], 
+        padding=[20, 10],
         font=('Segoe UI', 11, 'bold'),
         borderwidth=0,
-        relief='flat'
-    )
+        relief='flat')
     style.map('TNotebook.Tab',
-        background=[
-            ('selected', COLORS['card']), 
-            ('active', COLORS['card_hover'])
-        ],
-        foreground=[
-            ('selected', COLORS['accent']), 
-            ('active', COLORS['text'])
-        ]
-    )
+        background=[('selected', COLORS['accent']), ('active', COLORS['card_hover'])],
+        foreground=[('selected', '#FFFFFF'), ('active', COLORS['text'])])
 
     # Modern Treeview with enhanced visual hierarchy
     style.configure('Treeview',
-        background=COLORS['card'], 
+        background=COLORS['card'],
         fieldbackground=COLORS['card'],
-        foreground=COLORS['text'], 
+        foreground=COLORS['text'],
         bordercolor=COLORS['border'],
         borderwidth=1,
-        relief='solid',
-        rowheight=36, 
+        relief='flat',
+        rowheight=34,
         font=base_font)
     style.configure('Treeview.Heading',
-        background=COLORS['background'], 
+        background=COLORS['surface'],
         foreground=COLORS['text'],
         relief='flat',
         borderwidth=0,
         font=('Segoe UI', 11, 'bold'))
     style.map('Treeview',
-        background=[
-            ('selected', COLORS['accent']),
-            ('focus', COLORS['card_hover'])
-        ],
-        foreground=[
-            ('selected', '#ffffff'),
-            ('focus', COLORS['text'])
-        ]
-    )
+        background=[('selected', COLORS['accent']), ('focus', COLORS['card_hover'])],
+        foreground=[('selected', '#FFFFFF'), ('focus', COLORS['text'])])
 
-    # Standard buttons with subtle elevation effect
-    style.configure('TButton', 
-        background=COLORS['card'], 
-        foreground=COLORS['text'], 
-        borderwidth=1, 
-        relief='solid', 
-        bordercolor=COLORS['border'],
-        padding=(16, 14), 
-        font=button_font
-    )
+    # Buttons with pill appearance
+    base_button_conf = dict(
+        padding=(18, 10),
+        relief='flat',
+        borderwidth=0,
+        font=button_font)
+    style.configure(
+        'TButton',
+        **base_button_conf,
+        background=COLORS['card'],
+        foreground=COLORS['text'])
     style.map('TButton',
-        background=[
-            ('pressed', COLORS['border_light']), 
-            ('active', COLORS['card_hover']),
-            ('disabled', COLORS['background'])
-        ],
-        bordercolor=[
-            ('pressed', COLORS['border']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['border_light'])
-        ],
-        foreground=[
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', COLORS['card_hover']), ('pressed', COLORS['card_hover'])])
 
-    # Ultra-modern buttons with subtle shadows and enhanced hover states
-    style.configure('Accent.TButton', 
-        background=COLORS['accent'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(20, 18), 
-        font=button_font
-    )
+    style.configure('Accent.TButton',
+        **base_button_conf,
+        background=COLORS['accent'],
+        foreground=accent_text_color)
     style.map('Accent.TButton',
-        background=[
-            ('pressed', COLORS['accent_hover']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ],
-        relief=[('pressed', 'flat'), ('active', 'flat')]
-    )
+        background=[('active', COLORS['accent_hover']), ('pressed', COLORS['accent_hover'])],
+        foreground=[('pressed', accent_text_color)])
 
-    # Secondary Button
-    style.configure('Secondary.TButton', 
-        background=COLORS['background'], 
-        foreground=COLORS['text'], 
-        borderwidth=1, 
-        relief='solid', 
-        bordercolor=COLORS['border'],
-        padding=(18, 16), 
-        font=button_font
-    )
+    style.configure('Secondary.TButton',
+        **base_button_conf,
+        background=COLORS['surface'])
     style.map('Secondary.TButton',
-        background=[
-            ('pressed', COLORS['border_light']), 
-            ('active', COLORS['card']),
-            ('disabled', COLORS['background'])
-        ],
-        bordercolor=[
-            ('pressed', COLORS['border']), 
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['border_light'])
-        ],
-        foreground=[
-            ('active', COLORS['accent']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', COLORS['card_hover']), ('pressed', COLORS['card_hover'])])
 
-    # Warning Button
-    style.configure('Warning.TButton', 
-        background=COLORS['warning'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(18, 16), 
-        font=button_font
-    )
+    style.configure('Warning.TButton',
+        **base_button_conf,
+        background=COLORS['warning'],
+        foreground='#FFFFFF')
     style.map('Warning.TButton',
-        background=[
-            ('pressed', COLORS['warning']), 
-            ('active', COLORS['warning']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
+        background=[('active', '#FF8F9F'), ('pressed', '#FF8F9F')])
 
-    # Success Button
-    style.configure('Success.TButton', 
-        background=COLORS['success'], 
-        foreground='#ffffff', 
-        borderwidth=0, 
-        relief='flat',
-        padding=(18, 16), 
-        font=button_font
-    )
-    style.map('Success.TButton',
-        background=[
-            ('pressed', COLORS['success']), 
-            ('active', COLORS['success']),
-            ('disabled', COLORS['text_muted'])
-        ]
-    )
-
-    # Modern Checkboxes and Radio buttons
-    style.configure('TCheckbutton', 
-        background=COLORS['card'], 
+    # Toggle controls
+    style.configure('TCheckbutton',
+        background=COLORS['card'],
         foreground=COLORS['text'],
         font=base_font,
+        borderwidth=0,
+        focusthickness=2,
         focuscolor=COLORS['accent'])
     style.map('TCheckbutton',
         background=[('active', COLORS['card_hover'])],
         indicatorcolor=[('selected', COLORS['accent'])])
-        
-    style.configure('TRadiobutton', 
-        background=COLORS['card'], 
+
+    style.configure('TRadiobutton',
+        background=COLORS['card'],
         foreground=COLORS['text'],
         font=base_font,
+        borderwidth=0,
+        focusthickness=2,
         focuscolor=COLORS['accent'])
     style.map('TRadiobutton',
         background=[('active', COLORS['card_hover'])],
@@ -450,37 +403,28 @@ def apply_modern_theme(root, existing_style=None):
         borderwidth=0,
         width=12)
     style.map('TScrollbar',
-        background=[
-            ('active', COLORS['border']),
-            ('pressed', COLORS['border_light'])
-        ],
-        arrowcolor=[
-            ('active', COLORS['accent']),
-            ('pressed', COLORS['secondary'])
-        ]
-    )
+        background=[('active', COLORS['border']), ('pressed', COLORS['border_light'])],
+        arrowcolor=[('active', COLORS['accent']), ('pressed', COLORS['secondary'])])
 
     # Global TK widget styling
     root.option_add('*Font', base_font)
-    root.option_add('*Button.relief', 'solid')
-    root.option_add('*Button.borderWidth', '2')
+    root.option_add('*Button.relief', 'flat')
+    root.option_add('*Button.borderWidth', '0')
     root.option_add('*Button.highlightThickness', '0')
     root.option_add('*Button.activeBackground', COLORS['card_hover'])
     root.option_add('*Button.activeForeground', COLORS['text'])
     root.option_add('*Button.background', COLORS['card'])
     root.option_add('*Button.foreground', COLORS['text'])
-    root.option_add('*Button.font', ('Segoe UI', 10, 'bold'))
+    root.option_add('*Button.font', button_font)
 
     # Modern window styling
     root.configure(background=COLORS['background'])
-    
-    # Try to enable modern window decorations (Windows 11 style)
+
     try:
-        # Set modern window appearance
         root.tk.call('tk', 'scaling', 1.0)
     except Exception:
         pass
-    
+
     return style
 
 
@@ -2067,6 +2011,143 @@ def find_pdf_containing_serial(serial, pdf_texts: dict):
     return "BULUNAMADI"
 
 
+def _normalize_identifier(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", normalize_text(value))
+
+
+SERIAL_KEYWORDS = (
+    "seri", "serial", "s/no", "s\\/no", "imei", "imeı", "sn", "serino", "seri no",
+)
+
+
+def _extract_serial_candidates(text: Optional[str]) -> Set[str]:
+    if not text:
+        return set()
+    cleaned = normalize_text(text)
+    if not cleaned:
+        return set()
+
+    # İlk olarak anahtar kelimelerden sonra gelen dizileri yakala
+    results: Set[str] = set()
+    lowered = cleaned.casefold()
+    for keyword in SERIAL_KEYWORDS:
+        if keyword in lowered:
+            pattern = re.compile(rf"{re.escape(keyword)}\s*[:#\-]*\s*([A-Z0-9]+)", re.IGNORECASE)
+            for match in pattern.findall(text):
+                candidate = _normalize_identifier(match)
+                if len(candidate) >= 6:
+                    results.add(candidate)
+
+    # IMEI benzeri uzun sayı dizilerini de ayıkla
+    for match in re.findall(r"[A-Z0-9]{10,}", cleaned):
+        candidate = _normalize_identifier(match)
+        if len(candidate) >= 10:
+            results.add(candidate)
+
+    return results
+
+
+def parse_xml_invoice_metadata(xml_path: Path) -> Tuple[set, Dict[str, Optional[object]]]:
+    identifiers: set = set()
+    meta: Dict[str, Optional[object]] = {
+        "date": None,
+        "customer": None,
+        "supplier": None,
+        "amount": None,
+        "currency": None,
+        "serials": [],
+    }
+    try:
+        tree = ET.parse(str(xml_path))
+        root = tree.getroot()
+    except Exception:
+        return identifiers, meta
+
+    serial_candidates: Set[str] = set()
+
+    # ID ve UUID alanlarını yakala
+    id_tags = [".//{*}ID", ".//{*}UUID", ".//{*}InvoiceID", ".//{*}ProfileID"]
+    for tag in id_tags:
+        for elem in root.findall(tag):
+            if elem is not None and elem.text:
+                identifiers.add(elem.text.strip())
+
+    identifiers.add(xml_path.stem)
+
+    # Seri bilgisi içerebilecek alanları tara
+    for elem in root.findall('.//{*}SerialID'):
+        if elem is not None and elem.text:
+            serial_candidates.add(_normalize_identifier(elem.text))
+
+    for prop in root.findall('.//{*}AdditionalItemProperty'):
+        name_elem = prop.find('.//{*}Name')
+        value_elem = prop.find('.//{*}Value')
+        if name_elem is not None and value_elem is not None and name_elem.text:
+            if 'seri' in name_elem.text.casefold() or 'imei' in name_elem.text.casefold():
+                serial_candidates.add(_normalize_identifier(value_elem.text or ''))
+                serial_candidates.update(_extract_serial_candidates(value_elem.text))
+
+    for note_elem in root.findall('.//{*}Note'):
+        serial_candidates.update(_extract_serial_candidates(note_elem.text))
+
+    for desc_elem in root.findall('.//{*}Description'):
+        serial_candidates.update(_extract_serial_candidates(desc_elem.text))
+
+    serial_candidates = {s for s in serial_candidates if s}
+    if serial_candidates:
+        identifiers.update(serial_candidates)
+        meta["serials"] = sorted(serial_candidates)
+
+    issue_date = root.find('.//{*}IssueDate')
+    if issue_date is not None and issue_date.text:
+        meta["date"] = issue_date.text.strip()
+
+    cust = root.find('.//{*}AccountingCustomerParty//{*}Name')
+    if cust is not None and cust.text:
+        meta["customer"] = cust.text.strip()
+
+    supplier = root.find('.//{*}AccountingSupplierParty//{*}Name')
+    if supplier is not None and supplier.text:
+        meta["supplier"] = supplier.text.strip()
+
+    amount_elem = root.find('.//{*}PayableAmount')
+    if amount_elem is None:
+        amount_elem = root.find('.//{*}LineExtensionAmount')
+    if amount_elem is not None and amount_elem.text:
+        try:
+            meta["amount"] = parse_money(amount_elem.text)
+        except Exception:
+            meta["amount"] = None
+        meta["currency"] = amount_elem.attrib.get('currencyID') if hasattr(amount_elem, 'attrib') else None
+
+    return identifiers, meta
+
+
+def build_xml_index(xml_folder: Path) -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Optional[object]]]]:
+    index: Dict[str, Set[str]] = {}
+    meta: Dict[str, Dict[str, Optional[object]]] = {}
+    base = Path(xml_folder)
+    if not base.exists():
+        return {}, {}
+
+    for xml_path in sorted(base.rglob('*.xml')):
+        ids, info = parse_xml_invoice_metadata(xml_path)
+        try:
+            rel_name = str(xml_path.relative_to(base))
+        except ValueError:
+            rel_name = xml_path.name
+        info['file'] = rel_name
+        meta[rel_name] = info
+        for ident in ids:
+            norm = _normalize_identifier(ident)
+            if not norm:
+                continue
+            index.setdefault(norm, set()).add(rel_name)
+
+    normalized_index: Dict[str, List[str]] = {k: sorted(v) for k, v in index.items()}
+    return normalized_index, meta
+
+
 class PDFMatcherTab(ttk.Frame):
     def __init__(self, parent, apis, headers, invoice_tab_ref: InvoiceTab):
         super().__init__(parent, padding=10)
@@ -2410,6 +2491,429 @@ class PDFMatcherTab(ttk.Frame):
         self.log.delete('1.0', tk.END)
 
 
+
+class XMLMatcherTab(ttk.Frame):
+    def __init__(self, parent, apis, headers, invoice_tab_ref: InvoiceTab):
+        super().__init__(parent, padding=PADDING['large'])
+        self.apis = apis
+        self.headers = headers
+        self.invoice_tab_ref = invoice_tab_ref
+        self.settings = load_settings()
+
+        self.stop_event = threading.Event()
+        self.worker: Optional[threading.Thread] = None
+        self.last_params: Optional[Tuple[str, List[str]]] = None
+        self.output_dir: Optional[str] = None
+
+        self.xml_folder_var = tk.StringVar(value=self.settings.get('last_xml_folder', ''))
+        self.excel_files_var = tk.StringVar(value=self.settings.get('last_xml_excel', ''))
+        self.amount_tolerance = tk.StringVar(value=self.settings.get('xml_amount_tolerance', '1.0'))
+
+        self.columnconfigure(0, weight=1)
+
+        hero = ttk.Frame(self, style='Hero.TFrame', padding=PADDING['xlarge'])
+        hero.grid(row=0, column=0, sticky='ew')
+        hero.columnconfigure(0, weight=1)
+        ttk.Label(hero, text='🧾 XML Eşleştirici', style='HeroTitle.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Label(
+            hero,
+            text='UBL XML faturalarını Excel listeleriyle saniyeler içinde eşleştirin, tutar farklarını görün ve rapor alın.',
+            style='HeroSub.TLabel'
+        ).grid(row=1, column=0, sticky='w', pady=(PADDING['xs'], 0))
+
+        badge_bar = ttk.Frame(hero, style='Hero.TFrame')
+        badge_bar.grid(row=2, column=0, sticky='w', pady=(PADDING['small'], 0))
+        ttk.Label(badge_bar, text='Canlı Log', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_bar, text='Seri No analizi', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_bar, text='Excel karşılaştırma', style='HeroBadge.TLabel').pack(side='left')
+
+        content = ttk.Frame(self, style='Surface.TFrame', padding=PADDING['medium'])
+        content.grid(row=1, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        content.columnconfigure(0, weight=1)
+        content.columnconfigure(1, weight=1)
+
+        sources_card = ttk.LabelFrame(content, text='Veri Kaynakları', style='TLabelframe', padding=PADDING['medium'])
+        sources_card.grid(row=0, column=0, sticky='nsew', padx=(0, PADDING['medium']))
+        sources_card.columnconfigure(0, weight=1)
+
+        ttk.Label(sources_card, text='XML klasörünü seçin veya otomatik indirin.', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).pack(anchor='w')
+
+        xml_row = ttk.Frame(sources_card, style='Card.TFrame')
+        xml_row.pack(fill='x', pady=(PADDING['small'], 0))
+        ttk.Entry(xml_row, textvariable=self.xml_folder_var).pack(side='left', fill='x', expand=True)
+        ttk.Button(xml_row, text='📂 Klasör Seç', command=self._browse_xml_folder).pack(side='left', padx=(PADDING['small'], 0))
+
+        excel_row = ttk.Frame(sources_card, style='Card.TFrame')
+        excel_row.pack(fill='x', pady=(PADDING['small'], 0))
+        ttk.Entry(excel_row, textvariable=self.excel_files_var).pack(side='left', fill='x', expand=True)
+        ttk.Button(excel_row, text='📄 Dosya Seç', command=self._browse_excel_files).pack(side='left', padx=(PADDING['small'], 0))
+
+        ttk.Label(sources_card, text='Birden fazla Excel seçimi için ; ile ayrılmış yol listesi kullanılır.',
+                  style='Card.TLabel', foreground=COLORS['text_muted']).pack(anchor='w', pady=(PADDING['small'], 0))
+
+        download_card = ttk.LabelFrame(content, text='e-Fatura Gelen XML İndir', style='TLabelframe', padding=PADDING['medium'])
+        download_card.grid(row=0, column=1, sticky='nsew')
+        download_card.columnconfigure(1, weight=1)
+
+        ttk.Label(download_card, text='API Hesabı:', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        self.api_var = tk.StringVar()
+        self.api_cb = ttk.Combobox(download_card, values=list(apis.keys()), textvariable=self.api_var, state='readonly')
+        self.api_cb.grid(row=0, column=1, sticky='ew', padx=(PADDING['small'], 0))
+
+        if apis:
+            last_api = self.settings.get('last_xml_api') or self.settings.get('last_api', '')
+            if last_api in apis:
+                self.api_cb.set(last_api)
+            else:
+                self.api_cb.current(0)
+            apply_api(apis.get(self.api_cb.get(), ''), self.headers)
+        else:
+            self.api_cb.set('— API ekleyin (opsiyonel) —')
+        self.api_cb.configure(background=COLORS['card'], foreground=COLORS['text'])
+        self.api_cb.bind('<<ComboboxSelected>>', self._on_api_change)
+
+        now = datetime.now()
+        ttk.Label(download_card, text='Yıl:', style='Card.TLabel').grid(row=1, column=0, sticky='w', pady=(PADDING['small'], 0))
+        years = [str(now.year + i) for i in range(-10, 15)]
+        self.year = ttk.Combobox(download_card, values=years, width=6, state='readonly')
+        self.year.set(str(now.year))
+        self.year.grid(row=1, column=1, sticky='w', padx=(PADDING['small'], 0), pady=(PADDING['small'], 0))
+        self.year.configure(background=COLORS['card'], foreground=COLORS['text'])
+
+        ttk.Label(download_card, text='Ay:', style='Card.TLabel').grid(row=2, column=0, sticky='w')
+        self.month = ttk.Combobox(download_card, values=[f"{i:02d}" for i in range(1, 13)], width=4, state='readonly')
+        self.month.set(f"{now.month:02d}")
+        self.month.grid(row=2, column=1, sticky='w', padx=(PADDING['small'], 0))
+        self.month.configure(background=COLORS['card'], foreground=COLORS['text'])
+
+        self.btn_fetch_incoming = ttk.Button(
+            download_card,
+            text="📥 e-Fatura Gelen'den XML indir",
+            style='Accent.TButton',
+            command=self._fetch_incoming_xmls
+        )
+        self.btn_fetch_incoming.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(PADDING['medium'], 0))
+
+        options_card = ttk.LabelFrame(self, text='Eşleştirme Ayarları', style='TLabelframe', padding=PADDING['medium'])
+        options_card.grid(row=2, column=0, sticky='ew', pady=(PADDING['medium'], 0))
+        options_card.columnconfigure(1, weight=1)
+        ttk.Label(options_card, text='Tutar toleransı (TL):', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Entry(options_card, textvariable=self.amount_tolerance, width=12).grid(
+            row=0, column=1, sticky='w', padx=(PADDING['small'], PADDING['small']))
+        ttk.Label(options_card, text='Boş bırakılırsa tutar karşılaştırması yapılmaz.', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).grid(row=0, column=2, sticky='w')
+
+        actions_card = ttk.Frame(self, style='Card.TFrame', padding=PADDING['medium'])
+        actions_card.grid(row=3, column=0, sticky='ew', pady=(PADDING['medium'], 0))
+        actions_card.columnconfigure(0, weight=1)
+
+        buttons_left = ttk.Frame(actions_card, style='Card.TFrame')
+        buttons_left.grid(row=0, column=0, sticky='w')
+        self.btn_start = ttk.Button(buttons_left, text='🚀 Başlat', style='Accent.TButton', command=self._start_process)
+        self.btn_start.pack(side='left', padx=(0, PADDING['small']))
+        self.btn_stop = ttk.Button(buttons_left, text='⏹ Durdur', style='Warning.TButton',
+                                   command=self._stop_process, state='disabled')
+        self.btn_stop.pack(side='left', padx=(0, PADDING['small']))
+        self.btn_restart = ttk.Button(buttons_left, text='🔄 Yeniden', style='Secondary.TButton',
+                                      command=self._restart_process, state='disabled')
+        self.btn_restart.pack(side='left')
+
+        ttk.Button(actions_card, text='📁 Çıktı Klasörünü Aç', command=self._open_output_folder).grid(
+            row=0, column=1, sticky='e')
+
+        log_card = ttk.Frame(self, style='Card.TFrame', padding=PADDING['medium'])
+        log_card.grid(row=4, column=0, sticky='nsew', pady=(PADDING['medium'], 0))
+        log_card.columnconfigure(0, weight=1)
+        log_card.rowconfigure(1, weight=1)
+
+        ttk.Label(log_card, text='Canlı Log', style='Title.TLabel').grid(
+            row=0, column=0, sticky='w', padx=12, pady=(0, PADDING['xs']))
+        self.log = scrolledtext.ScrolledText(log_card, height=20, wrap='word')
+        self.log.grid(row=1, column=0, sticky='nsew', padx=12, pady=12)
+        style_scrolled_text(self.log)
+        try:
+            top = self.winfo_toplevel()
+            if hasattr(top, 'register_text_widget'):
+                top.register_text_widget(self.log)
+        except Exception:
+            pass
+
+        self.rowconfigure(4, weight=1)
+
+    def _on_api_change(self, _=None):
+        api_name = self.api_cb.get()
+        if api_name in self.apis:
+            apply_api(self.apis[api_name], self.headers)
+            self.settings['last_xml_api'] = api_name
+            save_settings(self.settings)
+
+    def _guard_api(self) -> bool:
+        api_name = self.api_cb.get()
+        return api_name in self.apis and bool((self.apis.get(api_name) or '').strip())
+
+    def _browse_xml_folder(self):
+        folder = filedialog.askdirectory(title='XML klasörü seç')
+        if folder:
+            self.xml_folder_var.set(folder)
+            self.settings['last_xml_folder'] = folder
+            save_settings(self.settings)
+
+    def _browse_excel_files(self):
+        files = filedialog.askopenfilenames(filetypes=[('Excel Dosyaları', '*.xlsx')])
+        if files:
+            joined = ';'.join(files)
+            self.excel_files_var.set(joined)
+            self.settings['last_xml_excel'] = joined
+            save_settings(self.settings)
+
+    def _fetch_incoming_xmls(self):
+        if requests is None:
+            messagebox.showerror('Eksik Bağımlılık', "requests yüklü değil.\nKomut: pip install requests")
+            return
+        if not self._guard_api():
+            messagebox.showwarning('API Gerekli', 'Önce bir API hesabı seçiniz / ekleyiniz.')
+            return
+        if not self.invoice_tab_ref.save_folder:
+            base = filedialog.askdirectory(title='İndirme için ana klasör seçin')
+            if not base:
+                return
+            self.invoice_tab_ref.save_folder = base
+            self.invoice_tab_ref.folder_label.config(text=f'Klasör: {base}')
+            self.invoice_tab_ref.settings['invoice_folder'] = base
+            save_settings(self.invoice_tab_ref.settings)
+
+        try:
+            y = int(self.year.get()); m = int(self.month.get())
+        except Exception:
+            messagebox.showerror('Hata', 'Geçerli yıl/ay seçiniz.')
+            return
+
+        api_name = self.api_cb.get()
+        apply_api(self.apis.get(api_name, ''), self.headers)
+
+        today = datetime.now().strftime('%d.%m.%Y')
+        sd = datetime(y, m, 1).strftime('%Y-%m-%dT00:00:00+03:00')
+        ed = datetime(y, m, calendar.monthrange(y, m)[1], 23, 59, 59).strftime('%Y-%m-%dT%H:%M:%S+03:00')
+
+        folder_name = f"{api_name} {int(m)}. ay {today} GelenXML"
+        base = os.path.join(self.invoice_tab_ref.save_folder, folder_name)
+        os.makedirs(base, exist_ok=True)
+
+        url = BASE_URLS['e-Fatura Gelen']
+        invs = self.invoice_tab_ref._get_invoices(url, sd, ed)
+        key = 'e-Fatura Gelen'
+
+        for inv in invs:
+            num, uid = inv.get('documentNumber') or inv.get('id'), inv.get('id')
+            if not num or not uid:
+                continue
+            d = os.path.join(base, 'xml'); os.makedirs(d, exist_ok=True)
+            r = requests.get(f"{BASE_URLS[key]}/{uid}/xml", headers=self.headers)
+            if r.status_code == 200:
+                with open(os.path.join(d, f"{num}.xml"), 'wb') as f:
+                    f.write(r.content)
+
+        xml_path = os.path.join(base, 'xml')
+        self.xml_folder_var.set(xml_path)
+        self.settings['last_xml_folder'] = xml_path
+        save_settings(self.settings)
+        self._log(f"✅ e-Fatura Gelen XML indirildi. Klasör: {xml_path}")
+        webbrowser.open(base)
+
+    def _start_process(self):
+        xml_folder = self.xml_folder_var.get().strip()
+        excel_paths = [p for p in self.excel_files_var.get().split(';') if p.strip()]
+        if not xml_folder or not os.path.isdir(xml_folder):
+            messagebox.showerror('Hata', 'Lütfen geçerli bir XML klasörü seçiniz.')
+            return
+        if not excel_paths:
+            messagebox.showerror('Hata', 'Lütfen en az bir Excel dosyası seçiniz.')
+            return
+
+        self.settings['last_xml_folder'] = xml_folder
+        self.settings['last_xml_excel'] = ';'.join(excel_paths)
+        self.settings['xml_amount_tolerance'] = self.amount_tolerance.get()
+        save_settings(self.settings)
+
+        self.stop_event.clear()
+        self.log_delete()
+        self.output_dir = os.path.join(os.getcwd(), 'xml_eslestirme_cikti')
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        self.btn_start.config(state='disabled')
+        self.btn_stop.config(state='normal')
+        self.btn_restart.config(state='disabled')
+
+        self.last_params = (xml_folder, excel_paths)
+        self.worker = threading.Thread(target=self._run_process, args=(xml_folder, excel_paths), daemon=True)
+        self.worker.start()
+
+    def _stop_process(self):
+        self.stop_event.set()
+        self._log('\n❌ İşlem durdurma talebi alındı.')
+        self.btn_stop.config(state='disabled')
+
+    def _restart_process(self):
+        if not self.last_params:
+            messagebox.showinfo('Bilgi', 'Önce bir işlem başlatın.')
+            return
+        if self.worker and self.worker.is_alive():
+            messagebox.showinfo('Bilgi', 'Devam eden bir işlem var. Lütfen durdurun.')
+            return
+        self.stop_event.clear()
+        self.log_delete()
+        self._log('🔁 Yeniden başlatılıyor...')
+        self.btn_start.config(state='disabled')
+        self.btn_stop.config(state='normal')
+        self.worker = threading.Thread(target=self._run_process, args=self.last_params, daemon=True)
+        self.worker.start()
+
+    def _open_output_folder(self):
+        if self.output_dir and os.path.exists(self.output_dir):
+            webbrowser.open(self.output_dir)
+        else:
+            messagebox.showwarning('Uyarı', 'Çıktı klasörü bulunamadı.')
+
+    def _run_process(self, xml_folder: str, excel_paths: List[str]):
+        start = time.time()
+        self._log(f'📂 XML klasörü: {xml_folder}')
+        self._log(f'📄 Excel dosyaları: {len(excel_paths)} adet')
+
+        index, xml_meta = build_xml_index(Path(xml_folder))
+        if not index:
+            self._log('⚠️ Hiç XML faturası okunamadı veya ID bilgisi bulunamadı.')
+            self._finalize()
+            return
+
+        try:
+            tol_raw = self.amount_tolerance.get().replace(',', '.')
+            tolerance = float(tol_raw) if tol_raw.strip() else None
+        except Exception:
+            tolerance = None
+            self._log('⚠️ Tolerans değeri okunamadı, tutar karşılaştırması yapılmayacak.')
+        else:
+            if tolerance is None:
+                self._log('ℹ️ Tutar karşılaştırması devre dışı bırakıldı.')
+            else:
+                self._log(f'ℹ️ Tutar toleransı: ±{tolerance:.2f} TL')
+
+        matched_records: List[Dict[str, object]] = []
+        unmatched_records: List[Dict[str, object]] = []
+        matched_xml_files: set = set()
+        total_rows = 0
+
+        for excel_path in excel_paths:
+            if self.stop_event.is_set():
+                self._log('🛑 Kullanıcı durdurdu; Excel işlemi sona eriyor.')
+                self._finalize()
+                return
+            self._log(f"📥 Excel işleniyor: {os.path.basename(excel_path)}")
+            df = read_excel_with_dynamic_header(excel_path, keywords=('Seri',))
+            if df is None:
+                self._log('⚠️ Uygun başlık bulunamadı. "Seri" başlığını içeren bir sayfa bekleniyor.')
+                continue
+
+            seri_col = (get_column_name(df.columns, 'seri')
+                        or get_column_name(df.columns, 'fatura')
+                        or get_column_name(df.columns, 'belge'))
+            if not seri_col:
+                self._log('⚠️ "Seri" veya "Fatura" sütunu bulunamadı; dosya atlandı.')
+                continue
+            nokta_col = (get_column_name(df.columns, 'nokta')
+                         or get_column_name(df.columns, 'işlem')
+                         or get_column_name(df.columns, 'mağaza'))
+            amount_col = (get_column_name(df.columns, 'tutar')
+                          or get_column_name(df.columns, 'toplam')
+                          or get_column_name(df.columns, 'kdv'))
+
+            df = df.dropna(subset=[seri_col])
+            total_rows += len(df)
+
+            for _, row in df.iterrows():
+                if self.stop_event.is_set():
+                    self._log('🛑 Kullanıcı durdurdu; satır taraması sona eriyor.')
+                    self._finalize()
+                    return
+                seri_val = str(row.get(seri_col, '')).strip()
+                norm = _normalize_identifier(seri_val)
+                if not norm:
+                    continue
+                candidates = index.get(norm, [])
+                if candidates:
+                    xml_file = candidates[0]
+                    matched_xml_files.add(xml_file)
+                    info = xml_meta.get(xml_file, {})
+                    excel_amount = None
+                    amount_diff = None
+                    if amount_col:
+                        try:
+                            excel_amount = parse_money(row.get(amount_col, 0))
+                        except Exception:
+                            excel_amount = None
+                    xml_amount = info.get('amount')
+                    if excel_amount is not None and xml_amount is not None:
+                        amount_diff = round(float(excel_amount) - float(xml_amount), 2)
+                    status = '✅'
+                    if tolerance is not None and amount_diff is not None and abs(amount_diff) > tolerance:
+                        status = '⚠️'
+                    matched_records.append({
+                        'Seri': seri_val,
+                        'Excel Dosyası': os.path.basename(excel_path),
+                        'İşlem Noktası': row.get(nokta_col) if nokta_col else None,
+                        'Excel Tutarı': excel_amount,
+                        'XML Tutarı': xml_amount,
+                        'Tutar Farkı': amount_diff,
+                        'Durum': status,
+                        'XML Dosyası': xml_file,
+                        'XML Tarih': info.get('date'),
+                        'Müşteri': info.get('customer'),
+                        'Tedarikçi': info.get('supplier'),
+                        'XML Seri Bilgileri': ', '.join(info.get('serials', [])) or None,
+                    })
+                else:
+                    unmatched_records.append({
+                        'Seri': seri_val,
+                        'Excel Dosyası': os.path.basename(excel_path),
+                        'İşlem Noktası': row.get(nokta_col) if nokta_col else None,
+                    })
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if matched_records:
+            matched_df = pd.DataFrame(matched_records)
+            match_path = os.path.join(self.output_dir, f'xml_eslesmeler_{timestamp}.xlsx')
+            matched_df.to_excel(match_path, index=False)
+            self._log(f'💾 Eşleşen faturalar kaydedildi: {os.path.basename(match_path)} ({len(matched_df)} satır)')
+        if unmatched_records:
+            unmatched_df = pd.DataFrame(unmatched_records)
+            missing_path = os.path.join(self.output_dir, f'xml_eslesmeyenler_{timestamp}.xlsx')
+            unmatched_df.to_excel(missing_path, index=False)
+            self._log(f'📄 Eşleşmeyenler kaydedildi: {os.path.basename(missing_path)} ({len(unmatched_df)} satır)')
+
+        unused_xml = set(xml_meta.keys()) - matched_xml_files
+        if unused_xml:
+            preview = ', '.join(sorted(unused_xml)[:5])
+            if len(unused_xml) > 5:
+                preview += ', …'
+            self._log(f'ℹ️ Excel listelerinde bulunmayan {len(unused_xml)} XML faturası var. Örnek: {preview}')
+
+        duration = time.time() - start
+        match_ratio = (len(matched_records) / total_rows * 100.0) if total_rows else 0.0
+        self._log(f'✅ Tamamlandı. Toplam satır: {total_rows}, Eşleşen: {len(matched_records)}, Oran: {match_ratio:.2f}%')
+        self._log(f'⏱ Süre: {duration:.2f} sn')
+        self._finalize()
+
+    def _finalize(self):
+        self.btn_start.config(state='normal')
+        self.btn_stop.config(state='disabled')
+        self.btn_restart.config(state='normal')
+
+    def _log(self, msg: str):
+        self.log.insert(tk.END, msg + '\n')
+        self.log.see(tk.END)
+
+    def log_delete(self):
+        self.log.delete('1.0', tk.END)
 # ========================== BÖLÜM 2/2 – DEVAM ===========================
 # ------------------- Envanter Yardımcıları & Sekmesi --------------------
 
@@ -2527,7 +3031,7 @@ DEFAULT_BUCKET_RULES: List[Tuple[str,str]] = [
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(2\.?\s*EL\s*SAAT|YEN[İI]\s*SAAT)", "SAAT"),
     (r"B[İI]LG[İI]SAYAR\s*&\s*OEM\s*;\s*2\.?\s*EL\s*NOTEBOOK", "NOTEBOOK"),
 ]
-BUCKET_ORDER = ["AKSESUAR","YENİ TELEFON","2.EL TELEFON","SAAT","TABLET","NOTEBOOK"]
+DEFAULT_BUCKET_ORDER = ["AKSESUAR","YENİ TELEFON","2.EL TELEFON","SAAT","TABLET","NOTEBOOK"]
 
 
 def apply_bucket_rules(cat_text: str, rules: List[Tuple[str,str]]) -> str:
@@ -2579,7 +3083,7 @@ def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,
 
 def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
                    exclude_keywords: List[str], bucket_rules: List[Tuple[str,str]],
-                   drop_totals: bool=True) -> Tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
+                   drop_totals: bool=True, bucket_order: Optional[Sequence[str]]=None) -> Tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     if not dfs:
         raise RuntimeError("İşlenecek veri yok.")
     df_all = pd.concat(dfs, ignore_index=True)
@@ -2604,7 +3108,13 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
     out["_alis_kdv_dahil"] = out[col_alis].apply(parse_money).astype(float)
     out["_bucket"] = out["_kategori"].apply(lambda s: apply_bucket_rules(s, bucket_rules))
 
-    summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(BUCKET_ORDER).fillna(0.0)
+    # Bucket sırasını kullanıcı tercihlerine göre düzenle
+    order = list(bucket_order or DEFAULT_BUCKET_ORDER)
+    existing = [b for b in order if b in set(out["_bucket"].unique())]
+    dynamic_remainder = [b for b in out["_bucket"].unique() if b not in order]
+    full_order = list(dict.fromkeys(order + existing + sorted(dynamic_remainder)))
+
+    summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(full_order).fillna(0.0)
 
     summary_view = summary.copy()
     summary_view["ADET"] = summary_view["ADET"].round(0).astype(int)
@@ -2670,14 +3180,14 @@ def _write_boxed_sheet(writer: pd.ExcelWriter, summary_df: pd.DataFrame, title_t
     total_row = summary_df.iloc[-1]
     total_adet = int(total_row["ADET"])
     total_ciro = float(total_row["ALIŞ CİRO (KDV DAHİL)"])
-    vals = {row["KATEGORİ"]: (int(row["ADET"]), float(row["ALIŞ CİRO (KDV DAHİL)"]))
-            for _, row in summary_df.iloc[:-1].iterrows()}
+    detail_rows = [
+        (row["KATEGORİ"], int(row["ADET"]), float(row["ALIŞ CİRO (KDV DAHİL)"]))
+        for _, row in summary_df.iloc[:-1].iterrows()
+    ]
 
-    for cat in BUCKET_ORDER:
-        if cat in vals:
-            adet, ciro = vals[cat]
-            if adet > 0 or ciro > 0:
-                row = add_block(row, adet, cat, ciro)
+    for cat, adet, ciro in detail_rows:
+        if adet > 0 or ciro > 0:
+            row = add_block(row, adet, cat, ciro)
 
     row = add_totals(row, total_adet, total_ciro)
 
@@ -2696,9 +3206,20 @@ def export_to_excel(summary_df: pd.DataFrame, detail_df: pd.DataFrame, raw_df: p
 
 # ---------- Ayar ----------
 def inv_load_config() -> dict:
+    settings = load_settings()
+    cfg = settings.get("inventory_config")
+    if isinstance(cfg, dict):
+        return cfg
     if INV_APP_CONFIG.exists():
         try:
-            return json.loads(INV_APP_CONFIG.read_text(encoding="utf-8"))
+            data = json.loads(INV_APP_CONFIG.read_text(encoding="utf-8"))
+            settings["inventory_config"] = data
+            save_settings(settings)
+            try:
+                INV_APP_CONFIG.unlink()
+            except Exception:
+                pass
+            return data if isinstance(data, dict) else {}
         except Exception:
             return {}
     return {}
@@ -2706,7 +3227,18 @@ def inv_load_config() -> dict:
 
 def inv_save_config(cfg: dict) -> bool:
     try:
-        INV_APP_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        settings = load_settings()
+    except Exception:
+        settings = APP_SETTINGS.copy()
+    settings["inventory_config"] = cfg
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=4)
+        if INV_APP_CONFIG.exists():
+            try:
+                INV_APP_CONFIG.unlink()
+            except Exception:
+                pass
         return True
     except Exception:
         return False
@@ -2727,7 +3259,8 @@ class InventoryTab(ttk.Frame):
         self.urun_col     = tk.StringVar(value="")
 
         self.drop_totals_var = tk.BooleanVar(value=True)
-        self.bucket_includes: Dict[str, tk.BooleanVar] = {b: tk.BooleanVar(value=True) for b in BUCKET_ORDER}
+        self.bucket_order: List[str] = list(DEFAULT_BUCKET_ORDER)
+        self.bucket_includes: Dict[str, tk.BooleanVar] = {}
         self.exclusions: List[str] = list(DEFAULT_EXCLUSIONS)
         self.bucket_rules: List[Tuple[str,str]] = list(DEFAULT_BUCKET_RULES)
 
@@ -2740,7 +3273,13 @@ class InventoryTab(ttk.Frame):
         self.detail_df : Optional[pd.DataFrame] = None
         self.raw_df    : Optional[pd.DataFrame] = None
 
+        self._auto_save_job: Optional[str] = None
+        self._loading_config = False
+
+        self._ensure_bucket_vars()
+
         self._build_ui()
+        self._bind_auto_save_traces()
         self.apply_config(inv_load_config())
 
     def _build_ui(self):
@@ -2766,23 +3305,83 @@ class InventoryTab(ttk.Frame):
         self.status_var = tk.StringVar(value="Hazır")
         ttk.Label(self, textvariable=self.status_var, anchor="w").pack(fill="x", side="bottom")
 
+    def _ensure_bucket_vars(self):
+        # Var olan ayarları korurken yeni bucketlar için değişken üret
+        for name in list(self.bucket_includes.keys()):
+            if name not in self.bucket_order:
+                self.bucket_includes.pop(name, None)
+        for name in self.bucket_order:
+            if name not in self.bucket_includes:
+                self.bucket_includes[name] = tk.BooleanVar(value=True)
+
+    def _bind_auto_save_traces(self):
+        vars_to_watch = [
+            self.sheet_filter_var,
+            self.outdir_var,
+            self.kategori_col,
+            self.adet_col,
+            self.alis_col,
+            self.urun_col,
+            self.header_mode,
+            self.header_text,
+            self.header_month,
+        ]
+        for var in vars_to_watch:
+            var.trace_add('write', self._on_any_var_changed)
+        self.drop_totals_var.trace_add('write', self._on_any_var_changed)
+
+    def _on_any_var_changed(self, *_):
+        self.schedule_auto_save()
+
+    def schedule_auto_save(self):
+        if self._loading_config:
+            return
+        if self._auto_save_job:
+            try:
+                self.after_cancel(self._auto_save_job)
+            except Exception:
+                pass
+        self._auto_save_job = self.after(1000, self._auto_save_now)
+
+    def _auto_save_now(self):
+        self._auto_save_job = None
+        self.save_current_config(silent=True)
+
     def _build_main_page(self):
         frm = self.page_main
-        top = ttk.Frame(frm)
-        top.pack(fill="x", padx=12, pady=8)
-        ttk.Label(top, text="Girdi Dosyaları / Klasör:").pack(side="left")
-        ttk.Button(top, text="Excel Ekle", command=self.add_files).pack(side="left", padx=5)
-        ttk.Button(top, text="Klasör Ekle", command=self.add_dir).pack(side="left", padx=5)
-        ttk.Button(top, text="Temizle", command=self.clear_inputs).pack(side="left", padx=5)
+        frm.columnconfigure(0, weight=1)
 
-        mid = ttk.Frame(frm)
-        mid.pack(fill="both", expand=True, padx=12, pady=6)
-        self.lst_inputs = tk.Listbox(mid, height=10)
-        self.lst_inputs.pack(side="left", fill="both", expand=True)
-        sb = ttk.Scrollbar(mid, orient="vertical", command=self.lst_inputs.yview)
-        sb.pack(side="left", fill="y")
+        hero = ttk.Frame(frm, style='Elevated.TFrame', padding=PADDING['medium'])
+        hero.pack(fill='x', padx=12, pady=(0, PADDING['medium']))
+        ttk.Label(hero, text='📦 Envanter Analizi', style='LargeTitle.TLabel').pack(anchor='w')
+        ttk.Label(
+            hero,
+            text='Excel envanter dosyalarını gruplayın, bucket filtreleriyle rafine edin ve tek tıkla modern kutu raporu alın.',
+            style='Card.TLabel',
+            foreground=COLORS['text_muted']
+        ).pack(anchor='w', pady=(6, 0))
+
+        sources = ttk.LabelFrame(frm, text='Veri Kaynakları', style='TLabelframe', padding=PADDING['medium'])
+        sources.pack(fill='both', expand=True, padx=12, pady=(0, PADDING['medium']))
+
+        header = ttk.Frame(sources, style='Card.TFrame')
+        header.pack(fill='x')
+        ttk.Label(header, text='Girdi Dosyaları / Klasör:', style='Card.TLabel', font=('Segoe UI', 11, 'bold')).pack(side='left')
+        btn_bar = ttk.Frame(header, style='Card.TFrame')
+        btn_bar.pack(side='right')
+        ttk.Button(btn_bar, text='➕ Excel Ekle', style='Accent.TButton', command=self.add_files).pack(side='left', padx=4)
+        ttk.Button(btn_bar, text='📁 Klasör', command=self.add_dir).pack(side='left', padx=4)
+        ttk.Button(btn_bar, text='🧹 Temizle', style='Secondary.TButton', command=self.clear_inputs).pack(side='left', padx=4)
+
+        list_container = ttk.Frame(sources, style='Card.TFrame')
+        list_container.pack(fill='both', expand=True, pady=(PADDING['small'], 0))
+        list_container.columnconfigure(0, weight=1)
+
+        self.lst_inputs = tk.Listbox(list_container, height=10)
+        self.lst_inputs.grid(row=0, column=0, sticky='nsew')
+        sb = ttk.Scrollbar(list_container, orient='vertical', command=self.lst_inputs.yview)
+        sb.grid(row=0, column=1, sticky='ns')
         self.lst_inputs.config(yscrollcommand=sb.set)
-        # Stil ve kayıt
         try:
             style_listbox(self.lst_inputs)
             top = self.winfo_toplevel()
@@ -2790,42 +3389,43 @@ class InventoryTab(ttk.Frame):
                 top.register_listbox_widget(self.lst_inputs)
         except Exception:
             pass
-        right = ttk.Frame(mid)
-        right.pack(side="left", fill="y", padx=10)
-        ttk.Button(right, text="Seçileni Sil", command=self.remove_selected_input).pack(fill="x", pady=2)
-        ttk.Button(right, text="Yukarı", command=lambda: self.move_input(-1)).pack(fill="x", pady=2)
-        ttk.Button(right, text="Aşağı", command=lambda: self.move_input(1)).pack(fill="x", pady=2)
 
-        bottom = ttk.LabelFrame(frm, text="Seçenekler")
-        bottom.pack(fill="x", padx=12, pady=8)
-        ttk.Checkbutton(bottom, text='"TOPLAM" satırlarını hariç tut', variable=self.drop_totals_var).pack(side="left", padx=5)
+        right = ttk.Frame(list_container, style='Card.TFrame')
+        right.grid(row=0, column=2, sticky='ns', padx=(PADDING['small'], 0))
+        ttk.Button(right, text='🗑 Seçileni Sil', command=self.remove_selected_input).pack(fill='x', pady=4)
+        ttk.Button(right, text='⬆ Yukarı', command=lambda: self.move_input(-1)).pack(fill='x', pady=4)
+        ttk.Button(right, text='⬇ Aşağı', command=lambda: self.move_input(1)).pack(fill='x', pady=4)
 
-        sf = ttk.Frame(frm)
-        sf.pack(fill="x", padx=12, pady=6)
-        ttk.Label(sf, text="Sheet Adı Filtresi (regex):").pack(side="left")
-        ttk.Entry(sf, textvariable=self.sheet_filter_var, width=30).pack(side="left", padx=5)
+        options = ttk.Frame(frm, style='Card.TFrame', padding=PADDING['medium'])
+        options.pack(fill='x', padx=12, pady=(0, PADDING['small']))
+        options.columnconfigure(1, weight=1)
+        ttk.Checkbutton(options, text='"TOPLAM" satırlarını hariç tut', variable=self.drop_totals_var).grid(row=0, column=0, sticky='w', pady=(0, PADDING['xs']))
+        ttk.Label(options, text='Sheet Adı Filtresi (regex):', style='Card.TLabel').grid(row=1, column=0, sticky='w')
+        ttk.Entry(options, textvariable=self.sheet_filter_var, width=30).grid(row=1, column=1, sticky='ew', padx=(PADDING['small'], 0))
 
-        rf = ttk.LabelFrame(frm, text="Rapor Başlığı (Kutu sayfası)")
-        rf.pack(fill="x", padx=12, pady=8)
-        ttk.Radiobutton(rf, text="Serbest yaz", variable=self.header_mode, value="free").grid(row=0, column=0, sticky="w", padx=4, pady=2)
-        ttk.Radiobutton(rf, text="Ay seç (1.)", variable=self.header_mode, value="month").grid(row=1, column=0, sticky="w", padx=4, pady=2)
-        ttk.Entry(rf, textvariable=self.header_text, width=20).grid(row=0, column=1, sticky="w", padx=6)
-        ttk.Label(rf, text="Ay:").grid(row=1, column=1, sticky="e")
-        ttk.Combobox(rf, textvariable=self.header_month, values=TR_MONTH_ABBR, state="readonly", width=8).grid(row=1, column=2, sticky="w", padx=6)
+        header_box = ttk.LabelFrame(frm, text='Rapor Başlığı (Kutu sayfası)', style='TLabelframe', padding=PADDING['medium'])
+        header_box.pack(fill='x', padx=12, pady=(0, PADDING['small']))
+        header_box.columnconfigure(1, weight=1)
+        ttk.Radiobutton(header_box, text='Serbest yaz', variable=self.header_mode, value='free').grid(row=0, column=0, sticky='w', padx=4, pady=2)
+        ttk.Radiobutton(header_box, text='Ay seç (1.)', variable=self.header_mode, value='month').grid(row=1, column=0, sticky='w', padx=4, pady=2)
+        ttk.Entry(header_box, textvariable=self.header_text, width=20).grid(row=0, column=1, sticky='w', padx=6)
+        ttk.Label(header_box, text='Ay:').grid(row=1, column=1, sticky='e')
+        ttk.Combobox(header_box, textvariable=self.header_month, values=TR_MONTH_ABBR, state='readonly', width=8).grid(row=1, column=2, sticky='w', padx=6)
 
-        of = ttk.Frame(frm)
-        of.pack(fill="x", padx=12, pady=6)
-        ttk.Label(of, text="Çıktı Klasörü:").pack(side="left")
-        ttk.Entry(of, textvariable=self.outdir_var).pack(side="left", fill="x", expand=True, padx=5)
-        ttk.Button(of, text="Gözat", command=self.pick_outdir).pack(side="left")
+        out_frame = ttk.Frame(frm, style='Card.TFrame', padding=PADDING['medium'])
+        out_frame.pack(fill='x', padx=12, pady=(0, PADDING['small']))
+        out_frame.columnconfigure(1, weight=1)
+        ttk.Label(out_frame, text='Çıktı Klasörü:', style='Card.TLabel').grid(row=0, column=0, sticky='w')
+        ttk.Entry(out_frame, textvariable=self.outdir_var).grid(row=0, column=1, sticky='ew', padx=(PADDING['small'], 0))
+        ttk.Button(out_frame, text='📂 Gözat', command=self.pick_outdir).grid(row=0, column=2, padx=(PADDING['small'], 0))
 
-        actions = ttk.Frame(frm)
-        actions.pack(fill="x", padx=12, pady=10)
-        ttk.Button(actions, text="Önizleme Oluştur", command=self.run_preview).pack(side="left", padx=5)
-        ttk.Button(actions, text="Excel'e Aktar", command=self.export_excel).pack(side="left", padx=5)
-        ttk.Button(actions, text="Klasörü Aç", command=self.open_outdir).pack(side="left", padx=5)
-        ttk.Button(actions, text="Ayarları Kaydet", command=self.save_current_config).pack(side="left", padx=5)
-        ttk.Button(actions, text="Ayar Yükle", command=self.load_config_action).pack(side="left", padx=5)
+        actions = ttk.Frame(frm, style='Card.TFrame', padding=PADDING['medium'])
+        actions.pack(fill='x', padx=12, pady=(0, PADDING['medium']))
+        ttk.Button(actions, text='🚀 Önizleme', style='Accent.TButton', command=self.run_preview).pack(side='left', padx=6)
+        ttk.Button(actions, text='💾 Excel\'e Aktar', command=self.export_excel).pack(side='left', padx=6)
+        ttk.Button(actions, text='📂 Klasörü Aç', command=self.open_outdir).pack(side='left', padx=6)
+        ttk.Button(actions, text='💡 Ayarları Yükle', command=self.load_config_action).pack(side='right', padx=6)
+        ttk.Button(actions, text='💾 Ayarları Kaydet', command=lambda: self.save_current_config(silent=False)).pack(side='right', padx=6)
 
     def _build_mapping_page(self):
         frm = self.page_mapping
@@ -2845,25 +3445,55 @@ class InventoryTab(ttk.Frame):
 
     def _build_rules_page(self):
         frm = self.page_rules
-        inc = ttk.LabelFrame(frm, text="Raporlanacak Bucket'lar")
-        inc.pack(fill="x", padx=12, pady=8)
-        row = ttk.Frame(inc)
-        row.pack(fill="x", padx=6, pady=6)
-        for i,b in enumerate(BUCKET_ORDER):
-            ttk.Checkbutton(row, text=b, variable=self.bucket_includes[b]).grid(row=0, column=i, sticky="w", padx=8)
+        frm.columnconfigure(0, weight=1)
 
-        exf = ttk.LabelFrame(frm, text="Hariç Tutulan Anahtarlar")
+        bucket_section = ttk.LabelFrame(frm, text="Bucket Yönetimi & Filtreler", style='TLabelframe', padding=PADDING['medium'])
+        bucket_section.pack(fill='x', padx=12, pady=8)
+
+        ttk.Label(bucket_section, text='Raporlanacak bucketları seçin ve sıralamasını düzenleyin.', style='Card.TLabel',
+                  foreground=COLORS['text_muted']).pack(anchor='w', padx=6, pady=(0, PADDING['small']))
+
+        self.bucket_checks_container = ttk.Frame(bucket_section, style='Card.TFrame')
+        self.bucket_checks_container.pack(fill='x', padx=6, pady=(0, PADDING['small']))
+
+        manager = ttk.Frame(bucket_section, style='Card.TFrame')
+        manager.pack(fill='x', padx=6, pady=(0, 0))
+        manager.columnconfigure(0, weight=1)
+
+        self.bucket_list = tk.Listbox(manager, height=6)
+        self.bucket_list.grid(row=0, column=0, rowspan=4, sticky='nsew')
+        try:
+            style_listbox(self.bucket_list)
+            top = self.winfo_toplevel()
+            if hasattr(top, 'register_listbox_widget'):
+                top.register_listbox_widget(self.bucket_list)
+        except Exception:
+            pass
+
+        btns = ttk.Frame(manager, style='Card.TFrame')
+        btns.grid(row=0, column=1, sticky='ns', padx=(PADDING['small'], 0))
+        ttk.Button(btns, text='⬆ Yukarı', command=lambda: self.move_bucket(-1)).pack(fill='x', pady=4)
+        ttk.Button(btns, text='⬇ Aşağı', command=lambda: self.move_bucket(1)).pack(fill='x', pady=4)
+        ttk.Button(btns, text='🗑 Sil', style='Secondary.TButton', command=self.remove_bucket).pack(fill='x', pady=4)
+
+        add_frame = ttk.Frame(manager, style='Card.TFrame')
+        add_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(PADDING['small'], 0))
+        add_frame.columnconfigure(0, weight=1)
+        self.new_bucket_var = tk.StringVar()
+        ttk.Entry(add_frame, textvariable=self.new_bucket_var).grid(row=0, column=0, sticky='ew', padx=(0, PADDING['small']))
+        ttk.Button(add_frame, text='➕ Bucket Ekle', style='Accent.TButton', command=self.add_bucket).grid(row=0, column=1)
+
+        exf = ttk.LabelFrame(frm, text="Hariç Tutulan Anahtarlar", style='TLabelframe', padding=PADDING['medium'])
         exf.pack(fill="both", padx=12, pady=8, expand=True)
-        ex_top = ttk.Frame(exf)
+        ex_top = ttk.Frame(exf, style='Card.TFrame')
         ex_top.pack(fill="x", pady=4)
         self.ex_entry = tk.Entry(ex_top)
         self.ex_entry.pack(side="left", fill="x", expand=True, padx=6)
-        ttk.Button(ex_top, text="Ekle", command=self.add_exclusion).pack(side="left", padx=4)
-        ttk.Button(ex_top, text="Sil (Seçili)", command=self.del_exclusion).pack(side="left", padx=4)
-        ttk.Button(ex_top, text="Temizle", command=self.clear_exclusions).pack(side="left", padx=4)
+        ttk.Button(ex_top, text="➕ Ekle", command=self.add_exclusion).pack(side="left", padx=4)
+        ttk.Button(ex_top, text="🗑 Sil", command=self.del_exclusion).pack(side="left", padx=4)
+        ttk.Button(ex_top, text="♻ Temizle", command=self.clear_exclusions).pack(side="left", padx=4)
         self.ex_list = tk.Listbox(exf, height=6)
         self.ex_list.pack(fill="both", expand=True, padx=6, pady=6)
-        # Stil ve kayıt
         try:
             style_listbox(self.ex_list)
             top = self.winfo_toplevel()
@@ -2872,24 +3502,27 @@ class InventoryTab(ttk.Frame):
         except Exception:
             pass
 
-        brf = ttk.LabelFrame(frm, text="Bucket Kuralları (Regex -> Bucket)")
+        brf = ttk.LabelFrame(frm, text="Bucket Kuralları (Regex -> Bucket)", style='TLabelframe', padding=PADDING['medium'])
         brf.pack(fill="both", padx=12, pady=8, expand=True)
-        br_top = ttk.Frame(brf)
-        br_top.pack(fill="x", pady=4)
+        brf.columnconfigure(0, weight=1)
+
+        br_top = ttk.Frame(brf, style='Card.TFrame')
+        br_top.grid(row=0, column=0, sticky='ew')
+        br_top.columnconfigure(0, weight=1)
         self.rule_pat = tk.Entry(br_top)
-        self.rule_pat.pack(side="left", fill="x", expand=True, padx=6)
-        self.rule_bucket = ttk.Combobox(br_top, values=BUCKET_ORDER, state="readonly")
-        self.rule_bucket.set("YENİ TELEFON")
-        self.rule_bucket.pack(side="left", padx=6)
-        ttk.Button(br_top, text="Kural Ekle", command=self.add_rule).pack(side="left", padx=4)
-        ttk.Button(br_top, text="Kural Sil (Seçili)", command=self.del_rule).pack(side="left", padx=4)
+        self.rule_pat.grid(row=0, column=0, sticky='ew', padx=(0, PADDING['small']))
+        self.rule_bucket = ttk.Combobox(br_top, state="readonly")
+        self.rule_bucket.grid(row=0, column=1, padx=(0, PADDING['small']))
+        ttk.Button(br_top, text="➕ Kural", style='Accent.TButton', command=self.add_rule).grid(row=0, column=2)
+        ttk.Button(br_top, text="🗑 Kural Sil", command=self.del_rule).grid(row=0, column=3, padx=(PADDING['small'], 0))
 
         self.rules_tv = ttk.Treeview(brf, columns=("pattern","bucket"), show="headings", height=6)
         self.rules_tv.heading("pattern", text="Regex Pattern")
         self.rules_tv.heading("bucket", text="Bucket")
-        self.rules_tv.pack(fill="both", expand=True, padx=6, pady=6)
+        self.rules_tv.grid(row=1, column=0, columnspan=4, sticky='nsew', pady=(PADDING['small'], 0))
+        brf.rowconfigure(1, weight=1)
         self.refresh_exclusions()
-        self.refresh_rules()
+        self._refresh_bucket_manager()
 
     def _build_preview_page(self):
         frm = self.page_preview
@@ -3007,13 +3640,15 @@ class InventoryTab(ttk.Frame):
                 col_overrides=self._collect_overrides(),
                 exclude_keywords=self.exclusions,
                 bucket_rules=self.bucket_rules,
-                drop_totals=self.drop_totals_var.get()
+                drop_totals=self.drop_totals_var.get(),
+                bucket_order=self.bucket_order
             )
 
             # Bucket filtreleri uygulanır
             include = {b for b,v in self.bucket_includes.items() if v.get()}
             if include:
-                summary = summary[summary["KATEGORİ"].isin(list(include)) + [True] ]  # toplam satır True
+                mask = summary["KATEGORİ"].isin(include) | summary["KATEGORİ"].eq("TÜM ADET / CİRO")
+                summary = summary[mask]
                 detail = detail[detail["_bucket"].isin(include)]
                 raw    = raw[raw["Bucket"].isin(include)]
 
@@ -3065,6 +3700,86 @@ class InventoryTab(ttk.Frame):
         for x in self.exclusions:
             self.ex_list.insert("end", x)
 
+    def _refresh_bucket_manager(self):
+        self._ensure_bucket_vars()
+        if hasattr(self, 'bucket_checks_container'):
+            for child in self.bucket_checks_container.winfo_children():
+                child.destroy()
+            for idx, bucket in enumerate(self.bucket_order):
+                row, col = divmod(idx, 3)
+                ttk.Checkbutton(
+                    self.bucket_checks_container,
+                    text=bucket,
+                    variable=self.bucket_includes[bucket],
+                    command=self._on_bucket_include_change
+                ).grid(row=row, column=col, sticky='w', padx=8, pady=4)
+        if hasattr(self, 'bucket_list'):
+            self.bucket_list.delete(0, 'end')
+            for bucket in self.bucket_order:
+                self.bucket_list.insert('end', bucket)
+        self._update_rule_bucket_values()
+        self.bucket_rules = [rule for rule in self.bucket_rules if rule[1] in self.bucket_order]
+        if hasattr(self, 'rules_tv'):
+            self.refresh_rules()
+
+    def _update_rule_bucket_values(self):
+        if hasattr(self, 'rule_bucket'):
+            current = self.rule_bucket.get()
+            self.rule_bucket['values'] = self.bucket_order
+            if current in self.bucket_order:
+                self.rule_bucket.set(current)
+            elif self.bucket_order:
+                self.rule_bucket.set(self.bucket_order[0])
+
+    def _on_bucket_include_change(self):
+        self.schedule_auto_save()
+
+    def add_bucket(self):
+        name = self.new_bucket_var.get().strip()
+        if not name:
+            return
+        normalized = normalize_text(name)
+        if not normalized:
+            return
+        display = name.upper()
+        if normalized not in [normalize_text(b) for b in self.bucket_order]:
+            self.bucket_order.append(display)
+            self.bucket_includes[display] = tk.BooleanVar(value=True)
+            self._refresh_bucket_manager()
+            self.schedule_auto_save()
+        self.new_bucket_var.set("")
+
+    def remove_bucket(self):
+        if not hasattr(self, 'bucket_list'):
+            return
+        sel = self.bucket_list.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        if idx < 0 or idx >= len(self.bucket_order):
+            return
+        bucket = self.bucket_order.pop(idx)
+        self.bucket_includes.pop(bucket, None)
+        self.bucket_rules = [rule for rule in self.bucket_rules if rule[1] != bucket]
+        self.refresh_rules()
+        self._refresh_bucket_manager()
+        self.schedule_auto_save()
+
+    def move_bucket(self, delta: int):
+        if not hasattr(self, 'bucket_list'):
+            return
+        sel = self.bucket_list.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        new_idx = idx + delta
+        if new_idx < 0 or new_idx >= len(self.bucket_order):
+            return
+        self.bucket_order[idx], self.bucket_order[new_idx] = self.bucket_order[new_idx], self.bucket_order[idx]
+        self._refresh_bucket_manager()
+        self.bucket_list.selection_set(new_idx)
+        self.schedule_auto_save()
+
     def add_exclusion(self):
         val = self.ex_entry.get().strip()
         if not val:
@@ -3073,6 +3788,7 @@ class InventoryTab(ttk.Frame):
             self.exclusions.append(val)
             self.refresh_exclusions()
             self.ex_entry.delete(0,"end")
+            self.schedule_auto_save()
 
     def del_exclusion(self):
         idx = self.ex_list.curselection()
@@ -3082,12 +3798,14 @@ class InventoryTab(ttk.Frame):
         try:
             self.exclusions.pop(i)
             self.refresh_exclusions()
+            self.schedule_auto_save()
         except Exception:
             pass
 
     def clear_exclusions(self):
         self.exclusions.clear()
         self.refresh_exclusions()
+        self.schedule_auto_save()
 
     def refresh_rules(self):
         for i in self.rules_tv.get_children():
@@ -3103,6 +3821,7 @@ class InventoryTab(ttk.Frame):
         self.bucket_rules.append((pat,buck))
         self.refresh_rules()
         self.rule_pat.delete(0,"end")
+        self.schedule_auto_save()
 
     def del_rule(self):
         sel = self.rules_tv.selection()
@@ -3112,6 +3831,7 @@ class InventoryTab(ttk.Frame):
             vals = self.rules_tv.item(item, "values")
             try:
                 self.bucket_rules.remove((vals[0], vals[1]))
+                self.schedule_auto_save()
             except Exception:
                 pass
             self.rules_tv.delete(item)
@@ -3140,7 +3860,13 @@ class InventoryTab(ttk.Frame):
         for _, row in df.head(2000).iterrows():
             self.preview_tv.insert("", "end", values=[row[c] for c in cols])
 
-    def save_current_config(self):
+    def save_current_config(self, silent: bool=False):
+        if self._auto_save_job and not silent:
+            try:
+                self.after_cancel(self._auto_save_job)
+            except Exception:
+                pass
+            self._auto_save_job = None
         cfg = {
             "sheet_filter": self.sheet_filter_var.get(),
             "outdir": self.outdir_var.get(),
@@ -3152,10 +3878,17 @@ class InventoryTab(ttk.Frame):
             "header_mode": self.header_mode.get(),
             "header_text": self.header_text.get(),
             "header_month": self.header_month.get(),
+            "bucket_order": list(self.bucket_order),
         }
         ok = inv_save_config(cfg)
-        self.status_var.set("Ayarlar kaydedildi." if ok else "Ayarlar kaydedilemedi.")
-        self.log_write("Ayarlar kaydedildi." if ok else "Ayarlar kaydedilemedi.")
+        if silent:
+            if ok:
+                self.status_var.set("Ayarlar otomatik kaydedildi.")
+        else:
+            msg = "Ayarlar kaydedildi." if ok else "Ayarlar kaydedilemedi."
+            self.status_var.set(msg)
+            self.log_write(msg)
+        return ok
 
     def load_config_action(self):
         cfg = inv_load_config()
@@ -3169,24 +3902,41 @@ class InventoryTab(ttk.Frame):
     def apply_config(self, cfg: dict):
         if not cfg:
             return
-        self.sheet_filter_var.set(cfg.get("sheet_filter",""))
-        self.outdir_var.set(cfg.get("outdir", self.outdir_var.get()))
-        ov = cfg.get("overrides", {})
-        self.kategori_col.set(ov.get("kategori",""))
-        self.adet_col.set(ov.get("adet",""))
-        self.alis_col.set(ov.get("alis",""))
-        self.urun_col.set(ov.get("ürün adı",""))
-        self.drop_totals_var.set(bool(cfg.get("drop_totals", True)))
-        self.exclusions = list(cfg.get("exclusions", DEFAULT_EXCLUSIONS))
-        self.bucket_rules = [tuple(x) for x in cfg.get("rules", DEFAULT_BUCKET_RULES)]
-        incs = cfg.get("includes", {})
-        for k,v in self.bucket_includes.items():
-            v.set(bool(incs.get(k, True)))
-        self.header_mode.set(cfg.get("header_mode","free"))
-        self.header_text.set(cfg.get("header_text", self.header_text.get()))
-        self.header_month.set(cfg.get("header_month", self.header_month.get()))
-        self.refresh_exclusions()
-        self.refresh_rules()
+        if self._auto_save_job:
+            try:
+                self.after_cancel(self._auto_save_job)
+            except Exception:
+                pass
+            self._auto_save_job = None
+        self._loading_config = True
+        try:
+            order = cfg.get("bucket_order")
+            if order:
+                self.bucket_order = list(order)
+            if not self.bucket_order:
+                self.bucket_order = list(DEFAULT_BUCKET_ORDER)
+            self._ensure_bucket_vars()
+
+            self.sheet_filter_var.set(cfg.get("sheet_filter",""))
+            self.outdir_var.set(cfg.get("outdir", self.outdir_var.get()))
+            ov = cfg.get("overrides", {})
+            self.kategori_col.set(ov.get("kategori",""))
+            self.adet_col.set(ov.get("adet",""))
+            self.alis_col.set(ov.get("alis",""))
+            self.urun_col.set(ov.get("ürün adı",""))
+            self.drop_totals_var.set(bool(cfg.get("drop_totals", True)))
+            self.exclusions = list(cfg.get("exclusions", DEFAULT_EXCLUSIONS))
+            self.bucket_rules = [tuple(x) for x in cfg.get("rules", DEFAULT_BUCKET_RULES)]
+            incs = cfg.get("includes", {})
+            for k,var in self.bucket_includes.items():
+                var.set(bool(incs.get(k, True)))
+            self.header_mode.set(cfg.get("header_mode","free"))
+            self.header_text.set(cfg.get("header_text", self.header_text.get()))
+            self.header_month.set(cfg.get("header_month", self.header_month.get()))
+            self.refresh_exclusions()
+            self._refresh_bucket_manager()
+        finally:
+            self._loading_config = False
 
     # Log
     def log_write(self, msg: str):
@@ -3201,9 +3951,10 @@ class InventoryTab(ttk.Frame):
 # HAKKIMIZDA SEKME
 # ===========================================================================
 class AboutTab(ttk.Frame):
-    def __init__(self, parent):
+    def __init__(self, parent, open_tab_callback=None):
         super().__init__(parent, padding=PADDING['xlarge'])
         self.parent = parent
+        self._open_tab = open_tab_callback or (lambda *_: None)
         
         # Ultra-modern header with gradient effect
         header_frame = ttk.Frame(self, style='Elevated.TFrame')
@@ -3272,7 +4023,7 @@ class AboutTab(ttk.Frame):
         # Enhanced feature cards with refined content
         features = [
             ('📈', 'Akıllı Raporlama', 'Otomatik KDV hesaplama ve detaylı mali raporlar'),
-            ('⚡', 'Hızlı Sorgulama', 'Gelişmiş arama algoritması ile anında sonuçlar'),
+            ('🧾', 'XML Eşleştirme', 'UBL XML faturalarını Excel kayıtlarıyla saniyeler içinde karşılaştırır'),
             ('🔗', 'PDF Eşleştirme', 'Yapay zeka destekli otomatik belge eşleştirme'),
             ('🎨', 'Premium Tasarım', 'Windows 11 tarzı modern ve şık arayüz')
         ]
@@ -3306,8 +4057,8 @@ class AboutTab(ttk.Frame):
         action_section.pack(fill='x', padx=PADDING['large'], pady=PADDING['medium'])
         
         # Action description
-        action_desc = ttk.Label(action_section, 
-                              text='Fatura yönetimine hemen başlayın veya mevcut verilerinizi analiz edin.',
+        action_desc = ttk.Label(action_section,
+                              text='Fatura ve belge akışınızı yönetin, raporlarınızı analiz edin.',
                               style='Card.TLabel', font=('Segoe UI', 11),
                               foreground='#64748B')
         action_desc.pack(anchor='w', pady=(0, PADDING['medium']))
@@ -3320,21 +4071,28 @@ class AboutTab(ttk.Frame):
         primary_frame = ttk.Frame(button_grid, style='Card.TFrame')
         primary_frame.pack(side='left', fill='x', expand=True)
         
-        ttk.Button(primary_frame, text='📄  Fatura İşlemleri', 
-                  style='Accent.TButton', width=20,
-                  command=lambda: self.parent.notebook.select(1)).pack(side='left', padx=(0, PADDING['medium']))
-        
-        ttk.Button(primary_frame, text='📈  Mali Raporlar', 
-                  style='Secondary.TButton', width=18,
-                  command=lambda: self.parent.notebook.select(2)).pack(side='left', padx=(0, PADDING['medium']))
+        ttk.Button(primary_frame, text='📄  Fatura İşlemleri',
+                  style='Accent.TButton', width=18,
+                  command=lambda: self._open_tab('invoice')).pack(side='left', padx=(0, PADDING['medium']))
+
+        ttk.Button(primary_frame, text='📈  Mali Raporlar',
+                  style='Secondary.TButton', width=16,
+                  command=lambda: self._open_tab('report')).pack(side='left', padx=(0, PADDING['medium']))
+
+        ttk.Button(primary_frame, text='📦  Envanter',
+                  style='TButton', width=16,
+                  command=lambda: self._open_tab('inventory')).pack(side='left')
         
         # Secondary actions
         secondary_frame = ttk.Frame(button_grid, style='Card.TFrame')
         secondary_frame.pack(side='right')
         
-        ttk.Button(secondary_frame, text='🔗  PDF Eşleştir', 
+        ttk.Button(secondary_frame, text='🔗  PDF Eşleştir',
                   style='TButton', width=15,
-                  command=lambda: self.parent.notebook.select(3)).pack(side='left', padx=PADDING['small'])
+                  command=lambda: self._open_tab('pdf')).pack(side='left', padx=PADDING['small'])
+        ttk.Button(secondary_frame, text='🧾  XML Eşleştir',
+                  style='TButton', width=15,
+                  command=lambda: self._open_tab('xml')).pack(side='left', padx=PADDING['small'])
 
         # Elegant footer with enhanced visual appeal
         footer_section = ttk.Frame(self, style='Card.TFrame')
@@ -3357,7 +4115,7 @@ class AboutTab(ttk.Frame):
         
         ttk.Label(footer_content, text=theme_hint, style='Card.TLabel',
                  font=('Segoe UI', 9), foreground=COLORS['text_muted']).pack(side='right')
-    
+
     def toggle_theme(self):
         """Toggle between light and dark theme"""
         try:
@@ -3387,7 +4145,7 @@ class AboutTab(ttk.Frame):
 class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("NES Toolkit – Fatura • Rapor • PDF Eşleştirici • Envanter")
+        self.title("NES Toolkit – Fatura • Rapor • PDF/XML Eşleştirici • Envanter")
         self.settings = load_settings()
 
         # Tema başlangıcı
@@ -3405,14 +4163,15 @@ class MainApp(tk.Tk):
         except Exception:
             self.geometry("1280x860")
         self.minsize(1024, 700)
-
-        # Modern Header Bar
-        topbar = ttk.Frame(self, style="Elevated.TFrame", padding=PADDING['medium'])
-        topbar.pack(fill="x", padx=PADDING['medium'], pady=PADDING['small'])
-
-        # Modern Logo Section
-        logo_frame = ttk.Frame(topbar, style="Card.TFrame")
-        logo_frame.pack(side='left')
+        
+        # Immersive hero header
+        hero = ttk.Frame(self, style='Hero.TFrame', padding=(PADDING['large'], PADDING['medium']))
+        hero.pack(fill='x', padx=PADDING['large'], pady=(PADDING['medium'], PADDING['small']))
+        hero.columnconfigure(0, weight=1)
+        hero.columnconfigure(1, weight=0)
+        
+        branding = ttk.Frame(hero, style='Hero.TFrame')
+        branding.grid(row=0, column=0, sticky='w')
         
         if HAS_PIL:
             try:
@@ -3423,48 +4182,69 @@ class MainApp(tk.Tk):
                     if logo_path.exists():
                         _img = Image.open(str(logo_path)).resize((140, 42), Image.LANCZOS)
                         self._logo_img = ImageTk.PhotoImage(_img)
-                        tk.Label(logo_frame, image=self._logo_img, bg=COLORS['card']).pack(side='left', padx=(0, PADDING['medium']))
+                        ttk.Label(branding, image=self._logo_img, style='HeroImage.TLabel').pack(anchor='w', pady=(0, PADDING['small']))
                         break
             except Exception:
                 pass
-
-        # Modern Title Section
-        title_frame = ttk.Frame(topbar, style="Card.TFrame")
-        title_frame.pack(side='left', padx=(0, PADDING['xlarge']))
         
-        ttk.Label(title_frame, text="🚀 NES Toolkit", style="LargeTitle.TLabel").pack(side="left")
-        version_label = ttk.Label(title_frame, text="v3.1 Modern", 
-                                 background=COLORS['card'], foreground=COLORS['accent'],
-                                 font=('Segoe UI', 9, 'bold'))
-        version_label.pack(side="left", padx=(PADDING['small'], 0))
-
-        # Modern Control Section (right side)
-        controls_frame = ttk.Frame(topbar, style="Card.TFrame")
-        controls_frame.pack(side='right')
+        ttk.Label(branding, text='NES Toolkit', style='HeroTitle.TLabel').pack(anchor='w')
+        ttk.Label(
+            branding,
+            text='Dijital fatura, PDF/XML eşleştirme ve envanter raporları tek panelde.',
+            style='HeroSub.TLabel'
+        ).pack(anchor='w', pady=(4, 0))
         
-        # Modern theme toggle
-        self._dark_var = tk.BooleanVar(value=(self.settings.get('theme','dark')=='dark'))
-        def _toggle_theme():
+        badge_row = ttk.Frame(branding, style='Hero.TFrame')
+        badge_row.pack(anchor='w', pady=(PADDING['small'], 0))
+        ttk.Label(badge_row, text='⚡ Otomatik Ayar Kaydı', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_row, text='🌓 Modern Koyu Tema', style='HeroBadge.TLabel').pack(side='left', padx=(0, PADDING['small']))
+        ttk.Label(badge_row, text='🧾 PDF/XML Uyumlu', style='HeroBadge.TLabel').pack(side='left')
+        
+        controls = ttk.Frame(hero, style='Hero.TFrame')
+        controls.grid(row=0, column=1, sticky='ne', padx=(PADDING['large'], 0))
+        
+        self._dark_var = tk.BooleanVar(value=(self.settings.get('theme', 'dark') == 'dark'))
+        
+        def update_theme_button():
+            icon = '🌙' if self._dark_var.get() else '☀️'
+            label = 'Koyu Tema Aktif' if self._dark_var.get() else 'Aydınlık Tema Aktif'
+            theme_btn.config(text=f"{icon}  {label}")
+        
+        def _apply_theme_state():
             global COLORS
             self.settings['theme'] = 'dark' if self._dark_var.get() else 'light'
             COLORS = DARK_COLORS.copy() if self._dark_var.get() else LIGHT_COLORS.copy()
             save_settings(self.settings)
-            # Reapply theme completely
             self.style = apply_modern_theme(self, self.style)
-            # ScrolledText alanlarını da yeniden boya
             for w in getattr(self, '_styled_texts', []):
                 style_scrolled_text(w)
-            # Listbox'ları yeniden boya
             for lb in getattr(self, '_styled_listboxes', []):
                 style_listbox(lb)
-            # Update window background
             self.configure(background=COLORS['background'])
-
-        ttk.Button(controls_frame, text="📁  Klasör Aç", style='TButton', 
-                  command=lambda: webbrowser.open(os.getcwd())).pack(side="right", padx=PADDING['small'])
-        ttk.Checkbutton(controls_frame, text="🌙  Koyu Tema", variable=self._dark_var, 
-                       command=_toggle_theme).pack(side='right', padx=PADDING['medium'])
-
+            update_theme_button()
+        
+        def _toggle_theme():
+            self._dark_var.set(not self._dark_var.get())
+            _apply_theme_state()
+        
+        theme_btn = ttk.Button(controls, text='', style='Secondary.TButton', command=_toggle_theme)
+        theme_btn.pack(fill='x', pady=(0, PADDING['xs']))
+        
+        ttk.Button(controls, text='📁 Çalışma Klasörü', style='TButton',
+                  command=lambda: webbrowser.open(os.getcwd())).pack(fill='x', pady=(PADDING['xs'], PADDING['xs']))
+        ttk.Button(controls, text='ℹ️  Hakkımızda', style='Accent.TButton',
+                  command=lambda: self.show_tab('about')).pack(fill='x', pady=(PADDING['xs'], 0))
+        
+        update_theme_button()
+        
+        workspace = ttk.Frame(self, style='Surface.TFrame', padding=PADDING['large'])
+        workspace.pack(fill='both', expand=True)
+        
+        notebook_container = ttk.Frame(workspace, style='Card.TFrame', padding=PADDING['large'])
+        notebook_container.pack(fill='both', expand=True)
+        
+        self.notebook = ttk.Notebook(notebook_container)
+        self.notebook.pack(fill='both', expand=True)
         # ScrolledText kayıt listesi (tema değişince yeniden boyamak için)
         self._styled_texts: List[tk.Text] = []
         def register_text_widget(w):
@@ -3483,28 +4263,40 @@ class MainApp(tk.Tk):
         self.apis = load_apis()
         self.headers = {}
 
-        # Notebook
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill='both', expand=True, padx=PADDING['medium'], pady=PADDING['small'])
-
         # Sekmeler
         self.invoice_tab = InvoiceTab(self.notebook, self.apis, self.headers)
         self.report_tab  = ReportTab(self.notebook, self.apis, self.headers)
         self.pdf_tab     = PDFMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
+        self.xml_tab     = XMLMatcherTab(self.notebook, self.apis, self.headers, self.invoice_tab)
         self.inv_tab     = InventoryTab(self.notebook)
-        self.about_tab   = AboutTab(self.notebook)
+        self.about_tab   = AboutTab(self.notebook, open_tab_callback=self.show_tab)
 
         self.notebook.add(self.invoice_tab, text='Fatura')
         self.notebook.add(self.report_tab,  text='Rapor')
         self.notebook.add(self.pdf_tab,     text='PDF Eşleştirici')
+        self.notebook.add(self.xml_tab,     text='XML Eşleştirici')
         self.notebook.add(self.inv_tab,     text='Envanter')
         self.notebook.add(self.about_tab,   text='Hakkımızda')
 
+        self._tab_lookup = {
+            'invoice': self.invoice_tab,
+            'report': self.report_tab,
+            'pdf': self.pdf_tab,
+            'xml': self.xml_tab,
+            'inventory': self.inv_tab,
+            'about': self.about_tab,
+        }
+        self._reverse_tab_lookup = {widget: key for key, widget in self._tab_lookup.items()}
+
         # Son seçili sekme
         try:
-            last = int(self.settings.get("last_tab", 0))
-            if 0 <= last < len(self.notebook.tabs()):
-                self.notebook.select(last)
+            last_key = self.settings.get("last_tab_key")
+            if last_key and last_key in self._tab_lookup:
+                self.show_tab(last_key)
+            else:
+                last = int(self.settings.get("last_tab", 0))
+                if 0 <= last < len(self.notebook.tabs()):
+                    self.notebook.select(last)
         except Exception:
             pass
 
@@ -3513,11 +4305,31 @@ class MainApp(tk.Tk):
 
     def _on_tab_changed(self, _evt=None):
         try:
-            idx = self.notebook.index(self.notebook.select())
+            current_id = self.notebook.select()
+            idx = self.notebook.index(current_id)
             self.settings["last_tab"] = idx
+            try:
+                widget = self.nametowidget(current_id)
+            except Exception:
+                widget = None
+            if widget in self._reverse_tab_lookup:
+                self.settings["last_tab_key"] = self._reverse_tab_lookup[widget]
             save_settings(self.settings)
         except Exception:
             pass
+
+    def _open_tab(self, key: str):
+        try:
+            main_app = self.winfo_toplevel()
+            if hasattr(main_app, 'show_tab'):
+                main_app.show_tab(key)
+        except Exception:
+            pass
+
+    def show_tab(self, key: str):
+        tab = self._tab_lookup.get(key)
+        if tab:
+            self.notebook.select(tab)
 
     def _on_close(self):
         try:
