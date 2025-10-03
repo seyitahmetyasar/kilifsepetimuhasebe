@@ -2447,6 +2447,15 @@ def normalize_text(x):
     return "" if pd.isna(x) else str(x).strip().upper()
 
 
+def normalize_serial(x) -> str:
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if not s or s.casefold() in {"nan", "none", "null"}:
+        return ""
+    return s.replace(" ", "").upper()
+
+
 def find_column(df: pd.DataFrame, cands: List[str], default_index: Optional[int]=None) -> str:
     cols = list(df.columns)
     if not cols:
@@ -2521,13 +2530,32 @@ DEFAULT_EXCLUSIONS = [
     "ZARAR","KAMPANYALI SEPET ÜRÜNÜ","KAMPANYALI EKRAN KORUYUCU","TELEFON ZARAR",
 ]
 DEFAULT_BUCKET_RULES: List[Tuple[str,str]] = [
-    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(YEN[İI]\s*TELEFON|TUŞLU\s*TELEFON|YEN[İI]LENM[İI]Ş\s*TELEFON)", "YENİ TELEFON"),
+    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*YEN[İI]LENM[İI]Ş\s*TELEFON", "YENİLENMİŞ TELEFON"),
+    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(YEN[İI]\s*TELEFON|TUŞLU\s*TELEFON)", "YENİ TELEFON"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*2\.?\s*EL\s*TELEFON", "2.EL TELEFON"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(2\.?\s*EL\s*TABLET|YEN[İI]\s*TABLET)", "TABLET"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(2\.?\s*EL\s*SAAT|YEN[İI]\s*SAAT)", "SAAT"),
     (r"B[İI]LG[İI]SAYAR\s*&\s*OEM\s*;\s*2\.?\s*EL\s*NOTEBOOK", "NOTEBOOK"),
 ]
-BUCKET_ORDER = ["AKSESUAR","YENİ TELEFON","2.EL TELEFON","SAAT","TABLET","NOTEBOOK"]
+CORE_SERIAL_BUCKETS = [
+    "YENİ TELEFON",
+    "YENİLENMİŞ TELEFON",
+    "2.EL TELEFON",
+    "TABLET",
+    "SAAT",
+    "NOTEBOOK",
+]
+BUCKET_ORDER = [
+    "AKSESUAR",
+    "SERİ AKSESUAR",
+    "YENİ TELEFON",
+    "YENİLENMİŞ TELEFON",
+    "2.EL TELEFON",
+    "SAAT",
+    "TABLET",
+    "NOTEBOOK",
+]
+TOTAL_ROW_KEYWORDS = ("TOPLAM", "GENEL TOPLAM")
 
 
 def apply_bucket_rules(cat_text: str, rules: List[Tuple[str,str]]) -> str:
@@ -2551,7 +2579,7 @@ def read_all_sheets(filepath: str, sheet_name_filter: Optional[str]=None) -> pd.
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,str,str,Optional[str]]:
+def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,str,str,Optional[str],Optional[str]]:
     if df is None or df.empty:
         raise ValueError("Boş veri çerçevesi.")
     def pick(key: str, cands: List[str], default_idx: int):
@@ -2561,9 +2589,9 @@ def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,
             if g:
                 return g
         return find_column(df, cands, default_index=default_idx)
-    col_kategori = pick("kategori", ["kategori","kategori adı","ürün grubu","grup"], 2)
-    col_adet     = pick("adet",     ["adet","miktar","qty"], 3)
-    col_alis     = pick("alis",     ["alış tutarı","alis tutari","kdv dahil alış","kdv dahil alis","[kdv dahil] alış tutarı"], 4)
+    col_kategori = pick("kategori", ["kategori","kategori adı","ürün grubu","grup","katagori"], 2)
+    col_adet     = pick("adet",     ["adet","miktar","qty","mevcut"], 3)
+    col_alis     = pick("alis",     ["alış tutarı","alis tutari","kdv dahil alış","kdv dahil alis","[kdv dahil] alış tutarı","alış fiyatı","alis fiyati"], 4)
     prod_ref = (col_overrides.get("ürün adı") or col_overrides.get("urun") or "").strip()
     prod_col=None
     if prod_ref:
@@ -2574,7 +2602,26 @@ def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,
             if maybe in df.columns:
                 prod_col=maybe
                 break
-    return col_kategori,col_adet,col_alis,prod_col
+    serial_col = None
+    serial_candidates = [
+        "imei",
+        "seri",
+        "seri no",
+        "imei/seri",
+        "seri/imei",
+        "seri num",
+    ]
+    cols_norm = [str(c).strip().casefold() for c in df.columns]
+    for cand in serial_candidates:
+        ccf = cand.casefold()
+        for idx, norm_name in enumerate(cols_norm):
+            if ccf in norm_name:
+                serial_col = df.columns[idx]
+                break
+        if serial_col:
+            break
+
+    return col_kategori,col_adet,col_alis,prod_col,serial_col
 
 
 def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
@@ -2582,27 +2629,93 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
                    drop_totals: bool=True) -> Tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
     if not dfs:
         raise RuntimeError("İşlenecek veri yok.")
-    df_all = pd.concat(dfs, ignore_index=True)
-    col_kategori,col_adet,col_alis,prod_col = locate_columns(df_all, col_overrides)
 
-    out = df_all.copy()
-    out["_kategori"] = out[col_kategori].map(normalize_text)
+    processed: List[pd.DataFrame] = []
+    for frame in dfs:
+        if frame is None or frame.empty:
+            continue
+        try:
+            col_kategori,col_adet,col_alis,prod_col,serial_col = locate_columns(frame, col_overrides)
+        except Exception:
+            continue
 
-    if drop_totals:
-        out = out[~out["_kategori"].str.contains("TOPLAM", na=False)]
-    out = out[out["_kategori"].str.len()>0]
+        if not serial_col:
+            # Serisiz tablolar bu akışta kullanılmıyor.
+            continue
 
-    if exclude_keywords:
-        pat = "|".join([re.escape(x) for x in exclude_keywords])
-        out = out[~out["_kategori"].str.contains(pat, na=False)]
-        if prod_col and prod_col in out.columns:
-            prod_norm = out[prod_col].map(normalize_text)
-            out = out[~prod_norm.str.contains(pat, na=False)]
+        local = frame.copy()
 
-    out["_adet"] = pd.to_numeric(out[col_adet].apply(lambda x: str(x).replace(",", ".") if pd.notna(x) else x),
-                                 errors="coerce").fillna(0).astype(float)
-    out["_alis_kdv_dahil"] = out[col_alis].apply(parse_money).astype(float)
-    out["_bucket"] = out["_kategori"].apply(lambda s: apply_bucket_rules(s, bucket_rules))
+        if col_kategori in local.columns:
+            local["_kategori_display"] = local[col_kategori]
+            local["_kategori"] = local[col_kategori].map(normalize_text)
+        else:
+            local["_kategori_display"] = ""
+            local["_kategori"] = ""
+        local["_kategori_display"] = local["_kategori_display"].fillna(local["_kategori"])
+
+        if prod_col and prod_col in local.columns:
+            local["_urun_display"] = local[prod_col]
+            local["_urun"] = local[prod_col].map(normalize_text)
+        else:
+            local["_urun_display"] = ""
+            local["_urun"] = ""
+        local["_urun_display"] = local["_urun_display"].fillna(local["_urun"])
+
+        if drop_totals:
+            total_pattern = "|".join(re.escape(x) for x in TOTAL_ROW_KEYWORDS)
+            mask = ~local["_kategori"].str.contains(total_pattern, na=False)
+            if "_urun" in local.columns:
+                mask &= ~local["_urun"].str.contains(total_pattern, na=False)
+            local = local[mask]
+        local = local[local["_kategori"].str.len() > 0]
+        if local.empty:
+            continue
+
+        if exclude_keywords:
+            pat = "|".join([re.escape(x) for x in exclude_keywords])
+            mask = ~local["_kategori"].str.contains(pat, na=False)
+            if prod_col and prod_col in local.columns:
+                prod_norm = local[prod_col].map(normalize_text)
+                mask &= ~prod_norm.str.contains(pat, na=False)
+            local = local[mask]
+            if local.empty:
+                continue
+
+        if col_alis in local.columns:
+            local["_alis_kdv_dahil"] = local[col_alis].apply(parse_money).astype(float)
+        else:
+            local["_alis_kdv_dahil"] = 0.0
+
+        local["_serial"] = local[serial_col].map(normalize_serial)
+
+        local["_has_serial"] = local["_serial"].str.len() > 0
+        local = local[local["_has_serial"]]
+        if local.empty:
+            continue
+
+        local["_adet"] = 1.0
+
+        local["_bucket"] = local["_kategori"].apply(lambda s: apply_bucket_rules(s, bucket_rules))
+
+        processed.append(local)
+
+    if not processed:
+        raise RuntimeError("İşlenecek veri yok.")
+
+    out = pd.concat(processed, ignore_index=True, sort=False)
+
+    core_set = set(CORE_SERIAL_BUCKETS)
+    serial_accessory_mask = (~out["_bucket"].isin(core_set)) & out["_has_serial"]
+    out.loc[serial_accessory_mask, "_bucket"] = "SERİ AKSESUAR"
+
+    non_serial_core = out["_bucket"].isin(core_set) & ~out["_has_serial"]
+    if bool(non_serial_core.any()):
+        out = out.loc[~non_serial_core].copy()
+
+    serial_rows = out["_has_serial"] & out["_serial"].str.len().gt(0)
+    if bool(serial_rows.any()):
+        serial_unique = out.loc[serial_rows].drop_duplicates(subset="_serial", keep="first")
+        out = pd.concat([out.loc[~serial_rows], serial_unique], ignore_index=True, sort=False)
 
     summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(BUCKET_ORDER).fillna(0.0)
 
@@ -2617,8 +2730,10 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
 
     detail = out.groupby(["_bucket","_kategori"]).agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reset_index().sort_values(["_bucket","_kategori"])
 
-    raw = out[[col_kategori,col_adet,col_alis,"_bucket","_kaynak_dosya","_kaynak_sayfa"]].copy()
-    raw.columns = ["Kategori","Adet","Alış Tutarı (KDV Dahil)","Bucket","Kaynak Dosya","Kaynak Sayfa"]
+    raw = out[["_kategori_display","_urun_display","_adet","_alis_kdv_dahil","_bucket","_kaynak_dosya","_kaynak_sayfa","_serial"]].copy()
+    raw.columns = ["Kategori","Ürün Adı","Adet","Alış Tutarı (KDV Dahil)","Bucket","Kaynak Dosya","Kaynak Sayfa","Seri / IMEI"]
+    raw["Kategori"] = raw["Kategori"].fillna("").astype(str)
+    raw["Ürün Adı"] = raw["Ürün Adı"].fillna("").astype(str)
 
     return summary_view, detail, raw
 
@@ -2674,10 +2789,8 @@ def _write_boxed_sheet(writer: pd.ExcelWriter, summary_df: pd.DataFrame, title_t
             for _, row in summary_df.iloc[:-1].iterrows()}
 
     for cat in BUCKET_ORDER:
-        if cat in vals:
-            adet, ciro = vals[cat]
-            if adet > 0 or ciro > 0:
-                row = add_block(row, adet, cat, ciro)
+        adet, ciro = vals.get(cat, (0, 0.0))
+        row = add_block(row, adet, cat, ciro)
 
     row = add_totals(row, total_adet, total_ciro)
 
@@ -2721,10 +2834,10 @@ class InventoryTab(ttk.Frame):
         self.sheet_filter_var = tk.StringVar(value="")
         self.outdir_var = tk.StringVar(value=str(get_desktop_dir()))
 
-        self.kategori_col = tk.StringVar(value="")
+        self.kategori_col = tk.StringVar(value="K")
         self.adet_col     = tk.StringVar(value="")
         self.alis_col     = tk.StringVar(value="")
-        self.urun_col     = tk.StringVar(value="")
+        self.urun_col     = tk.StringVar(value="J")
 
         self.drop_totals_var = tk.BooleanVar(value=True)
         self.bucket_includes: Dict[str, tk.BooleanVar] = {b: tk.BooleanVar(value=True) for b in BUCKET_ORDER}
@@ -3013,9 +3126,20 @@ class InventoryTab(ttk.Frame):
             # Bucket filtreleri uygulanır
             include = {b for b,v in self.bucket_includes.items() if v.get()}
             if include:
-                summary = summary[summary["KATEGORİ"].isin(list(include)) + [True] ]  # toplam satır True
-                detail = detail[detail["_bucket"].isin(include)]
-                raw    = raw[raw["Bucket"].isin(include)]
+                summary_mask = summary["KATEGORİ"].isin(include) | (summary["KATEGORİ"] == "TÜM ADET / CİRO")
+                detail_mask = detail["_bucket"].isin(include)
+                raw_mask = raw["Bucket"].isin(include)
+
+                if len(summary_mask) != len(summary):
+                    raise ValueError("Summary mask length mismatch")
+                if len(detail_mask) != len(detail):
+                    raise ValueError("Detail mask length mismatch")
+                if len(raw_mask) != len(raw):
+                    raise ValueError("Raw mask length mismatch")
+
+                summary = summary[summary_mask]
+                detail = detail[detail_mask]
+                raw = raw[raw_mask]
 
             self.summary_df = summary
             self.detail_df  = detail.rename(columns={"_bucket":"Bucket","_kategori":"Kategori","ADET":"Adet","ALIS_CIRO":"Alış Ciro"})
@@ -3172,10 +3296,14 @@ class InventoryTab(ttk.Frame):
         self.sheet_filter_var.set(cfg.get("sheet_filter",""))
         self.outdir_var.set(cfg.get("outdir", self.outdir_var.get()))
         ov = cfg.get("overrides", {})
-        self.kategori_col.set(ov.get("kategori",""))
-        self.adet_col.set(ov.get("adet",""))
-        self.alis_col.set(ov.get("alis",""))
-        self.urun_col.set(ov.get("ürün adı",""))
+        if "kategori" in ov and str(ov.get("kategori", "")).strip():
+            self.kategori_col.set(ov.get("kategori"))
+        if "adet" in ov:
+            self.adet_col.set(ov.get("adet",""))
+        if "alis" in ov:
+            self.alis_col.set(ov.get("alis",""))
+        if "ürün adı" in ov and str(ov.get("ürün adı", "")).strip():
+            self.urun_col.set(ov.get("ürün adı"))
         self.drop_totals_var.set(bool(cfg.get("drop_totals", True)))
         self.exclusions = list(cfg.get("exclusions", DEFAULT_EXCLUSIONS))
         self.bucket_rules = [tuple(x) for x in cfg.get("rules", DEFAULT_BUCKET_RULES)]
