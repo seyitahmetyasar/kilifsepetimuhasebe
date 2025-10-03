@@ -2658,15 +2658,15 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
     if serial_col:
         serial_accessory_mask = (~out["_bucket"].isin(core_set)) & out["_has_serial"]
         out.loc[serial_accessory_mask, "_bucket"] = "SERİ AKSESUAR"
+        out.loc[out["_has_serial"], "_adet"] = 1.0
     accessory_mask = ~out["_bucket"].isin(core_set)
     out.loc[accessory_mask & ~out["_has_serial"], "_bucket"] = "AKSESUAR"
 
     if serial_col:
-        serial_rows = out["_bucket"] == "SERİ AKSESUAR"
+        serial_rows = out["_has_serial"] & (out["_serial"].str.len() > 0)
         if bool(serial_rows.any()):
-            serial_unique = out.loc[serial_rows & out["_serial"].str.len() > 0].copy()
+            serial_unique = out.loc[serial_rows].copy()
             serial_unique = serial_unique.drop_duplicates(subset="_serial", keep="first")
-            serial_unique.loc[:, "_adet"] = 1.0
             out = pd.concat([out.loc[~serial_rows], serial_unique], ignore_index=True)
 
     summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(BUCKET_ORDER).fillna(0.0)
