@@ -2546,15 +2546,16 @@ CORE_SERIAL_BUCKETS = [
     "NOTEBOOK",
 ]
 BUCKET_ORDER = [
+    "AKSESUAR",
+    "SERİ AKSESUAR",
     "YENİ TELEFON",
     "YENİLENMİŞ TELEFON",
     "2.EL TELEFON",
-    "TABLET",
     "SAAT",
+    "TABLET",
     "NOTEBOOK",
-    "SERİ AKSESUAR",
-    "AKSESUAR",
 ]
+TOTAL_ROW_KEYWORDS = ("TOPLAM", "GENEL TOPLAM")
 
 
 def apply_bucket_rules(cat_text: str, rules: List[Tuple[str,str]]) -> str:
@@ -2638,6 +2639,10 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
         except Exception:
             continue
 
+        if not serial_col:
+            # Serisiz tablolar bu akışta kullanılmıyor.
+            continue
+
         local = frame.copy()
 
         if col_kategori in local.columns:
@@ -2648,8 +2653,20 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
             local["_kategori"] = ""
         local["_kategori_display"] = local["_kategori_display"].fillna(local["_kategori"])
 
+        if prod_col and prod_col in local.columns:
+            local["_urun_display"] = local[prod_col]
+            local["_urun"] = local[prod_col].map(normalize_text)
+        else:
+            local["_urun_display"] = ""
+            local["_urun"] = ""
+        local["_urun_display"] = local["_urun_display"].fillna(local["_urun"])
+
         if drop_totals:
-            local = local[~local["_kategori"].str.contains("TOPLAM", na=False)]
+            total_pattern = "|".join(re.escape(x) for x in TOTAL_ROW_KEYWORDS)
+            mask = ~local["_kategori"].str.contains(total_pattern, na=False)
+            if "_urun" in local.columns:
+                mask &= ~local["_urun"].str.contains(total_pattern, na=False)
+            local = local[mask]
         local = local[local["_kategori"].str.len() > 0]
         if local.empty:
             continue
@@ -2664,25 +2681,19 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
             if local.empty:
                 continue
 
-        if col_adet in local.columns:
-            local["_adet"] = pd.to_numeric(local[col_adet].apply(lambda x: str(x).replace(",", ".") if pd.notna(x) else x),
-                                             errors="coerce").fillna(0.0).astype(float)
-        else:
-            local["_adet"] = 0.0
-
         if col_alis in local.columns:
             local["_alis_kdv_dahil"] = local[col_alis].apply(parse_money).astype(float)
         else:
             local["_alis_kdv_dahil"] = 0.0
 
-        if serial_col and serial_col in local.columns:
-            local["_serial"] = local[serial_col].map(normalize_serial)
-        else:
-            local["_serial"] = ""
+        local["_serial"] = local[serial_col].map(normalize_serial)
 
         local["_has_serial"] = local["_serial"].str.len() > 0
-        if bool(local["_has_serial"].any()):
-            local.loc[local["_has_serial"], "_adet"] = 1.0
+        local = local[local["_has_serial"]]
+        if local.empty:
+            continue
+
+        local["_adet"] = 1.0
 
         local["_bucket"] = local["_kategori"].apply(lambda s: apply_bucket_rules(s, bucket_rules))
 
@@ -2706,8 +2717,6 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
         serial_unique = out.loc[serial_rows].drop_duplicates(subset="_serial", keep="first")
         out = pd.concat([out.loc[~serial_rows], serial_unique], ignore_index=True, sort=False)
 
-    out.loc[~out["_bucket"].isin(core_set) & ~out["_has_serial"], "_bucket"] = "AKSESUAR"
-
     summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(BUCKET_ORDER).fillna(0.0)
 
     summary_view = summary.copy()
@@ -2721,9 +2730,10 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
 
     detail = out.groupby(["_bucket","_kategori"]).agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reset_index().sort_values(["_bucket","_kategori"])
 
-    raw = out[["_kategori_display","_adet","_alis_kdv_dahil","_bucket","_kaynak_dosya","_kaynak_sayfa","_serial"]].copy()
-    raw.columns = ["Kategori","Adet","Alış Tutarı (KDV Dahil)","Bucket","Kaynak Dosya","Kaynak Sayfa","Seri / IMEI"]
+    raw = out[["_kategori_display","_urun_display","_adet","_alis_kdv_dahil","_bucket","_kaynak_dosya","_kaynak_sayfa","_serial"]].copy()
+    raw.columns = ["Kategori","Ürün Adı","Adet","Alış Tutarı (KDV Dahil)","Bucket","Kaynak Dosya","Kaynak Sayfa","Seri / IMEI"]
     raw["Kategori"] = raw["Kategori"].fillna("").astype(str)
+    raw["Ürün Adı"] = raw["Ürün Adı"].fillna("").astype(str)
 
     return summary_view, detail, raw
 
@@ -2779,10 +2789,8 @@ def _write_boxed_sheet(writer: pd.ExcelWriter, summary_df: pd.DataFrame, title_t
             for _, row in summary_df.iloc[:-1].iterrows()}
 
     for cat in BUCKET_ORDER:
-        if cat in vals:
-            adet, ciro = vals[cat]
-            if adet > 0 or ciro > 0:
-                row = add_block(row, adet, cat, ciro)
+        adet, ciro = vals.get(cat, (0, 0.0))
+        row = add_block(row, adet, cat, ciro)
 
     row = add_totals(row, total_adet, total_ciro)
 
@@ -2826,10 +2834,10 @@ class InventoryTab(ttk.Frame):
         self.sheet_filter_var = tk.StringVar(value="")
         self.outdir_var = tk.StringVar(value=str(get_desktop_dir()))
 
-        self.kategori_col = tk.StringVar(value="")
+        self.kategori_col = tk.StringVar(value="K")
         self.adet_col     = tk.StringVar(value="")
         self.alis_col     = tk.StringVar(value="")
-        self.urun_col     = tk.StringVar(value="")
+        self.urun_col     = tk.StringVar(value="J")
 
         self.drop_totals_var = tk.BooleanVar(value=True)
         self.bucket_includes: Dict[str, tk.BooleanVar] = {b: tk.BooleanVar(value=True) for b in BUCKET_ORDER}
@@ -3288,10 +3296,14 @@ class InventoryTab(ttk.Frame):
         self.sheet_filter_var.set(cfg.get("sheet_filter",""))
         self.outdir_var.set(cfg.get("outdir", self.outdir_var.get()))
         ov = cfg.get("overrides", {})
-        self.kategori_col.set(ov.get("kategori",""))
-        self.adet_col.set(ov.get("adet",""))
-        self.alis_col.set(ov.get("alis",""))
-        self.urun_col.set(ov.get("ürün adı",""))
+        if "kategori" in ov and str(ov.get("kategori", "")).strip():
+            self.kategori_col.set(ov.get("kategori"))
+        if "adet" in ov:
+            self.adet_col.set(ov.get("adet",""))
+        if "alis" in ov:
+            self.alis_col.set(ov.get("alis",""))
+        if "ürün adı" in ov and str(ov.get("ürün adı", "")).strip():
+            self.urun_col.set(ov.get("ürün adı"))
         self.drop_totals_var.set(bool(cfg.get("drop_totals", True)))
         self.exclusions = list(cfg.get("exclusions", DEFAULT_EXCLUSIONS))
         self.bucket_rules = [tuple(x) for x in cfg.get("rules", DEFAULT_BUCKET_RULES)]
