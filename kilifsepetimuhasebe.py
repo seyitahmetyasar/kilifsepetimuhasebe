@@ -2447,6 +2447,15 @@ def normalize_text(x):
     return "" if pd.isna(x) else str(x).strip().upper()
 
 
+def normalize_serial(x) -> str:
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if not s or s.casefold() in {"nan", "none", "null"}:
+        return ""
+    return s.replace(" ", "").upper()
+
+
 def find_column(df: pd.DataFrame, cands: List[str], default_index: Optional[int]=None) -> str:
     cols = list(df.columns)
     if not cols:
@@ -2521,13 +2530,31 @@ DEFAULT_EXCLUSIONS = [
     "ZARAR","KAMPANYALI SEPET ÜRÜNÜ","KAMPANYALI EKRAN KORUYUCU","TELEFON ZARAR",
 ]
 DEFAULT_BUCKET_RULES: List[Tuple[str,str]] = [
-    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(YEN[İI]\s*TELEFON|TUŞLU\s*TELEFON|YEN[İI]LENM[İI]Ş\s*TELEFON)", "YENİ TELEFON"),
+    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*YEN[İI]LENM[İI]Ş\s*TELEFON", "YENİLENMİŞ TELEFON"),
+    (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(YEN[İI]\s*TELEFON|TUŞLU\s*TELEFON)", "YENİ TELEFON"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*2\.?\s*EL\s*TELEFON", "2.EL TELEFON"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(2\.?\s*EL\s*TABLET|YEN[İI]\s*TABLET)", "TABLET"),
     (r"TELEFON\s*&\s*TABLET\s*&\s*SAAT\s*;\s*(2\.?\s*EL\s*SAAT|YEN[İI]\s*SAAT)", "SAAT"),
     (r"B[İI]LG[İI]SAYAR\s*&\s*OEM\s*;\s*2\.?\s*EL\s*NOTEBOOK", "NOTEBOOK"),
 ]
-BUCKET_ORDER = ["AKSESUAR","YENİ TELEFON","2.EL TELEFON","SAAT","TABLET","NOTEBOOK"]
+CORE_SERIAL_BUCKETS = [
+    "YENİ TELEFON",
+    "YENİLENMİŞ TELEFON",
+    "2.EL TELEFON",
+    "TABLET",
+    "SAAT",
+    "NOTEBOOK",
+]
+BUCKET_ORDER = [
+    "YENİ TELEFON",
+    "YENİLENMİŞ TELEFON",
+    "2.EL TELEFON",
+    "TABLET",
+    "SAAT",
+    "NOTEBOOK",
+    "SERİ AKSESUAR",
+    "AKSESUAR",
+]
 
 
 def apply_bucket_rules(cat_text: str, rules: List[Tuple[str,str]]) -> str:
@@ -2551,7 +2578,7 @@ def read_all_sheets(filepath: str, sheet_name_filter: Optional[str]=None) -> pd.
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,str,str,Optional[str]]:
+def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,str,str,Optional[str],Optional[str]]:
     if df is None or df.empty:
         raise ValueError("Boş veri çerçevesi.")
     def pick(key: str, cands: List[str], default_idx: int):
@@ -2574,7 +2601,26 @@ def locate_columns(df: pd.DataFrame, col_overrides: Dict[str,str]) -> Tuple[str,
             if maybe in df.columns:
                 prod_col=maybe
                 break
-    return col_kategori,col_adet,col_alis,prod_col
+    serial_col = None
+    serial_candidates = [
+        "imei",
+        "seri",
+        "seri no",
+        "imei/seri",
+        "seri/imei",
+        "seri num",
+    ]
+    cols_norm = [str(c).strip().casefold() for c in df.columns]
+    for cand in serial_candidates:
+        ccf = cand.casefold()
+        for idx, norm_name in enumerate(cols_norm):
+            if ccf in norm_name:
+                serial_col = df.columns[idx]
+                break
+        if serial_col:
+            break
+
+    return col_kategori,col_adet,col_alis,prod_col,serial_col
 
 
 def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
@@ -2583,10 +2629,15 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
     if not dfs:
         raise RuntimeError("İşlenecek veri yok.")
     df_all = pd.concat(dfs, ignore_index=True)
-    col_kategori,col_adet,col_alis,prod_col = locate_columns(df_all, col_overrides)
+    col_kategori,col_adet,col_alis,prod_col,serial_col = locate_columns(df_all, col_overrides)
 
     out = df_all.copy()
     out["_kategori"] = out[col_kategori].map(normalize_text)
+    if serial_col:
+        out["_serial"] = out[serial_col].map(normalize_serial)
+    else:
+        out["_serial"] = ""
+    out["_has_serial"] = out["_serial"].str.len() > 0
 
     if drop_totals:
         out = out[~out["_kategori"].str.contains("TOPLAM", na=False)]
@@ -2603,6 +2654,20 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
                                  errors="coerce").fillna(0).astype(float)
     out["_alis_kdv_dahil"] = out[col_alis].apply(parse_money).astype(float)
     out["_bucket"] = out["_kategori"].apply(lambda s: apply_bucket_rules(s, bucket_rules))
+    core_set = set(CORE_SERIAL_BUCKETS)
+    if serial_col:
+        serial_accessory_mask = (~out["_bucket"].isin(core_set)) & out["_has_serial"]
+        out.loc[serial_accessory_mask, "_bucket"] = "SERİ AKSESUAR"
+    accessory_mask = ~out["_bucket"].isin(core_set)
+    out.loc[accessory_mask & ~out["_has_serial"], "_bucket"] = "AKSESUAR"
+
+    if serial_col:
+        serial_rows = out["_bucket"] == "SERİ AKSESUAR"
+        if bool(serial_rows.any()):
+            serial_unique = out.loc[serial_rows & out["_serial"].str.len() > 0].copy()
+            serial_unique = serial_unique.drop_duplicates(subset="_serial", keep="first")
+            serial_unique.loc[:, "_adet"] = 1.0
+            out = pd.concat([out.loc[~serial_rows], serial_unique], ignore_index=True)
 
     summary = out.groupby("_bucket").agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reindex(BUCKET_ORDER).fillna(0.0)
 
@@ -2617,8 +2682,18 @@ def process_frames(dfs: List[pd.DataFrame], col_overrides: Dict[str,str],
 
     detail = out.groupby(["_bucket","_kategori"]).agg(ADET=("_adet","sum"), ALIS_CIRO=("_alis_kdv_dahil","sum")).reset_index().sort_values(["_bucket","_kategori"])
 
-    raw = out[[col_kategori,col_adet,col_alis,"_bucket","_kaynak_dosya","_kaynak_sayfa"]].copy()
-    raw.columns = ["Kategori","Adet","Alış Tutarı (KDV Dahil)","Bucket","Kaynak Dosya","Kaynak Sayfa"]
+    raw_columns: List[Tuple[str,str]] = [
+        (col_kategori, "Kategori"),
+        ("_adet", "Adet"),
+        ("_alis_kdv_dahil", "Alış Tutarı (KDV Dahil)"),
+        ("_bucket", "Bucket"),
+        ("_kaynak_dosya", "Kaynak Dosya"),
+        ("_kaynak_sayfa", "Kaynak Sayfa"),
+    ]
+    if serial_col:
+        raw_columns.append(("_serial", "Seri / IMEI"))
+    raw = out[[col for col,_ in raw_columns]].copy()
+    raw.columns = [name for _,name in raw_columns]
 
     return summary_view, detail, raw
 
